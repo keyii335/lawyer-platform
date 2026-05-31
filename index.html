@@ -1,0 +1,3570 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>律师办公平台</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --primary: #1a365d;
+    --primary-light: #2b6cb0;
+    --accent: #e53e3e;
+    --success: #38a169;
+    --warning: #d69e2e;
+    --bg: #f7fafc;
+    --card: #ffffff;
+    --text: #1a202c;
+    --text-secondary: #718096;
+    --border: #e2e8f0;
+    --sidebar-w: 230px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, "Microsoft YaHei", "PingFang SC", sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+  .sidebar {
+    position: fixed; left: 0; top: 0; bottom: 0; width: var(--sidebar-w);
+    background: var(--primary); color: #fff; z-index: 100;
+    display: flex; flex-direction: column; transition: transform 0.3s;
+  }
+  .sidebar-logo { padding: 24px 20px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  .sidebar-logo h1 { font-size: 20px; font-weight: 700; letter-spacing: 2px; }
+  .sidebar-logo p { font-size: 12px; opacity: 0.7; margin-top: 4px; }
+  .sidebar-nav { flex: 1; padding: 12px 0; overflow-y: auto; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 20px; cursor: pointer; transition: background 0.2s;
+    font-size: 14px; border-left: 3px solid transparent;
+  }
+  .nav-item:hover { background: rgba(255,255,255,0.08); }
+  .nav-item.active { background: rgba(255,255,255,0.12); border-left-color: #63b3ed; }
+  .nav-item svg { width: 18px; height: 18px; flex-shrink: 0; }
+  .sidebar-footer { padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.1); font-size: 12px; opacity: 0.6; }
+
+  .main { margin-left: var(--sidebar-w); min-height: 100vh; }
+  .topbar {
+    height: 60px; background: var(--card); border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; padding: 0 28px;
+    position: sticky; top: 0; z-index: 50;
+  }
+  .topbar-title { font-size: 18px; font-weight: 600; }
+  .topbar-actions { display: flex; align-items: center; gap: 16px; }
+  .badge { position: relative; }
+  .badge-dot {
+    position: absolute; top: -4px; right: -6px; width: 16px; height: 16px;
+    background: var(--accent); color: #fff; font-size: 10px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .notify-btn, .settings-btn { background: none; border: none; cursor: pointer; color: var(--text-secondary); }
+  .content { padding: 28px; }
+
+  .card { background: var(--card); border-radius: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); padding: 20px; }
+  .card-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .card-title { font-size: 16px; font-weight: 600; }
+
+  .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background: var(--card); border-radius: 10px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); position: relative; overflow: hidden; }
+  .stat-card::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; }
+  .stat-card.blue::before { background: var(--primary-light); }
+  .stat-card.red::before { background: var(--accent); }
+  .stat-card.green::before { background: var(--success); }
+  .stat-card.yellow::before { background: var(--warning); }
+  .stat-number { font-size: 28px; font-weight: 700; margin: 4px 0; }
+  .stat-label { font-size: 13px; color: var(--text-secondary); }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 16px; border-radius: 7px; font-size: 13px; font-weight: 500;
+    cursor: pointer; border: none; transition: all 0.2s;
+  }
+  .btn-primary { background: var(--primary); color: #fff; }
+  .btn-primary:hover { background: var(--primary-light); }
+  .btn-danger { background: var(--accent); color: #fff; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-outline:hover { background: var(--bg); }
+  .btn-sm { padding: 5px 10px; font-size: 12px; }
+  .btn-success { background: var(--success); color: #fff; }
+
+  .form-group { margin-bottom: 14px; }
+  .form-label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 5px; color: var(--text-secondary); }
+  .form-input, .form-select, .form-textarea {
+    width: 100%; padding: 9px 12px; border: 1px solid var(--border); border-radius: 7px;
+    font-size: 14px; font-family: inherit; transition: border 0.2s;
+  }
+  .form-input:focus, .form-select:focus, .form-textarea:focus { outline: none; border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(43,108,176,0.1); }
+  .form-textarea { resize: vertical; min-height: 80px; }
+
+  .table-wrap { overflow-x: auto; }
+  .table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  .table th { background: var(--bg); padding: 10px 14px; text-align: left; font-weight: 600; font-size: 13px; color: var(--text-secondary); border-bottom: 2px solid var(--border); }
+  .table td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  .table tr:hover td { background: #f7fafc; }
+
+  .tag { display: inline-block; padding: 2px 9px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+  .tag-blue { background: #ebf8ff; color: #2b6cb0; }
+  .tag-red { background: #fff5f5; color: #e53e3e; }
+  .tag-green { background: #f0fff4; color: #38a169; }
+  .tag-yellow { background: #fffff0; color: #d69e2e; }
+  .tag-gray { background: #f7fafc; color: #718096; }
+  .tag-purple { background: #faf5ff; color: #805ad5; }
+
+  .priority-urgent { border-left: 4px solid var(--accent); }
+  .priority-high { border-left: 4px solid #dd6b20; }
+  .priority-medium { border-left: 4px solid var(--warning); }
+  .priority-low { border-left: 4px solid var(--success); }
+
+  .calendar { width: 100%; }
+  .calendar-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+  .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; }
+  .cal-day-header { text-align: center; font-size: 12px; font-weight: 600; color: var(--text-secondary); padding: 6px; }
+  .cal-day {
+    min-height: 80px; padding: 4px; border: 1px solid var(--border); border-radius: 6px;
+    font-size: 12px; cursor: pointer; transition: background 0.15s; position: relative;
+  }
+  .cal-day:hover { background: #ebf8ff; }
+  .cal-day.today { background: #ebf8ff; border-color: var(--primary-light); }
+  .cal-day.other-month { opacity: 0.35; }
+  .cal-day-num { font-weight: 600; margin-bottom: 2px; }
+  .cal-event { font-size: 10px; padding: 1px 4px; border-radius: 3px; margin-bottom: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cal-event.court { background: #fed7d7; color: #c53030; }
+  .cal-event.meeting { background: #bee3f8; color: #2b6cb0; }
+  .cal-event.deadline { background: #fefcbf; color: #975a16; }
+  .cal-event.other { background: #e9d8fd; color: #553c9a; }
+
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 200;
+    display: flex; align-items: center; justify-content: center; opacity: 0;
+    pointer-events: none; transition: opacity 0.2s;
+  }
+  .modal-overlay.active { opacity: 1; pointer-events: auto; }
+  .modal {
+    background: var(--card); border-radius: 12px; width: 560px; max-width: 95vw;
+    max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+    transform: translateY(20px); transition: transform 0.2s;
+  }
+  .modal-overlay.active .modal { transform: translateY(0); }
+  .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 18px 22px; border-bottom: 1px solid var(--border); }
+  .modal-title { font-size: 17px; font-weight: 600; }
+  .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; color: var(--text-secondary); }
+  .modal-body { padding: 22px; }
+  .modal-footer { padding: 14px 22px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
+
+  .tabs { display: flex; gap: 0; border-bottom: 2px solid var(--border); margin-bottom: 20px; }
+  .tab {
+    padding: 10px 18px; font-size: 14px; cursor: pointer; border-bottom: 2px solid transparent;
+    margin-bottom: -2px; color: var(--text-secondary); transition: all 0.2s; font-weight: 500;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--primary); border-bottom-color: var(--primary); font-weight: 600; }
+
+  .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; }
+  .toast {
+    padding: 12px 20px; border-radius: 8px; color: #fff; font-size: 14px;
+    margin-bottom: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    animation: slideIn 0.3s ease;
+  }
+  .toast.success { background: var(--success); }
+  .toast.error { background: var(--accent); }
+  .toast.info { background: var(--primary-light); }
+  @keyframes slideIn { from { transform: translateX(100px); opacity: 0; } to { transform: none; opacity: 1; } }
+
+  .reminder-item { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 8px; margin-bottom: 8px; }
+  .reminder-item.urgent { background: #fff5f5; border: 1px solid #fed7d7; }
+  .reminder-item.warning { background: #fffff0; border: 1px solid #fefcbf; }
+  .reminder-item.normal { background: #f0fff4; border: 1px solid #c6f6d5; }
+
+  .calc-result { background: var(--bg); border-radius: 10px; padding: 20px; margin-top: 16px; }
+  .calc-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .calc-row:last-child { border-bottom: none; font-weight: 700; font-size: 16px; color: var(--primary); }
+
+  .template-card { border: 1px solid var(--border); border-radius: 8px; padding: 16px; cursor: pointer; transition: all 0.2s; }
+  .template-card:hover { border-color: var(--primary-light); box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+
+  .timer-display { font-size: 48px; font-weight: 700; text-align: center; font-variant-numeric: tabular-nums; letter-spacing: 2px; }
+  .timer-btn { width: 56px; height: 56px; border-radius: 50%; border: none; cursor: pointer; font-size: 20px; display: inline-flex; align-items: center; justify-content: center; }
+
+  .mobile-header { display: none; }
+  @media (max-width: 768px) {
+    .sidebar { transform: translateX(-100%); }
+    .sidebar.open { transform: translateX(0); }
+    .main { margin-left: 0; }
+    .mobile-header { display: flex; }
+    .stats-grid { grid-template-columns: 1fr 1fr; }
+    .content { padding: 16px; }
+  }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-thumb { background: #cbd5e0; border-radius: 3px; }
+
+  /* 要素式诉状生成器样式 */
+  .yaosushi-container { max-width: 1100px; }
+  .ys-type-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; margin-bottom: 24px; }
+  .ys-type-card {
+    border: 2px solid var(--border); border-radius: 10px; padding: 14px 16px;
+    cursor: pointer; transition: all 0.2s; text-align: center;
+    background: var(--card);
+  }
+  .ys-type-card:hover { border-color: var(--primary-light); background: #ebf8ff; }
+  .ys-type-card.selected { border-color: var(--primary); background: #ebf8ff; color: var(--primary); font-weight: 600; }
+  .ys-type-icon { font-size: 26px; margin-bottom: 6px; }
+  .ys-type-name { font-size: 13px; }
+
+  .ys-form-section { background: var(--card); border-radius: 10px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .ys-section-title { font-size: 15px; font-weight: 700; color: var(--primary); margin-bottom: 14px; padding-bottom: 8px; border-bottom: 2px solid var(--primary-light); }
+  .ys-field { margin-bottom: 12px; }
+  .ys-field label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 4px; color: var(--text-secondary); }
+  .ys-field label .ys-req { color: var(--accent); }
+  .ys-field input, .ys-field textarea, .ys-field select {
+    width: 100%; padding: 8px 11px; border: 1px solid var(--border); border-radius: 7px;
+    font-size: 13px; font-family: inherit; transition: border 0.2s;
+  }
+  .ys-field input:focus, .ys-field textarea:focus, .ys-field select:focus { outline: none; border-color: var(--primary-light); box-shadow: 0 0 0 3px rgba(43,108,176,0.1); }
+  .ys-field textarea { resize: vertical; min-height: 70px; }
+  .ys-checkbox-group { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 4px; }
+  .ys-checkbox-group label { display: flex; align-items: center; gap: 5px; font-size: 13px; cursor: pointer; }
+  .ys-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .ys-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+
+  .ys-preview { background: #fffef5; border: 1px solid #e2d89e; border-radius: 10px; padding: 30px; font-family: "SimSun", "宋体", serif; font-size: 14px; line-height: 1.9; }
+  .ys-preview h2 { text-align: center; font-size: 20px; margin-bottom: 4px; letter-spacing: 3px; }
+  .ys-preview .ys-cause { text-align: center; font-size: 14px; margin-bottom: 20px; color: #555; }
+  .ys-preview .ys-preview-section { margin-bottom: 14px; }
+  .ys-preview .ys-preview-section-title { font-weight: 700; font-size: 15px; border-left: 4px solid var(--primary); padding-left: 8px; margin-bottom: 8px; }
+  .ys-preview-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .ys-preview-table td { padding: 7px 12px; border: 1px solid #ccc; vertical-align: top; }
+  .ys-preview-table td:first-child { width: 38%; background: #f8f6ee; font-weight: 500; }
+  .ys-preview-table td:last-child { background: #fff; }
+  .ys-preview-signature { text-align: right; margin-top: 30px; }
+
+  /* 保全费计算器 */
+  .pres-result { background: var(--bg); border-radius: 10px; padding: 20px; margin-top: 16px; }
+  .pres-row { display: flex; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 14px; }
+  .pres-row:last-child { border-bottom: none; font-weight: 700; font-size: 15px; color: var(--primary); }
+
+  .timer-record { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--border); font-size: 14px; }
+
+  /* 智能解析对话框 */
+  .ys-parse-dialog {
+    background: linear-gradient(135deg, #f0f7ff 0%, #e8f4fd 100%);
+    border: 2px solid #63b3ed; border-radius: 14px; padding: 24px;
+    margin-bottom: 20px; position: relative;
+  }
+  .ys-parse-dialog-title {
+    font-size: 16px; font-weight: 700; color: var(--primary);
+    margin-bottom: 6px; display: flex; align-items: center; gap: 8px;
+  }
+  .ys-parse-dialog-desc {
+    font-size: 13px; color: #4a5568; margin-bottom: 16px; line-height: 1.6;
+  }
+  .ys-parse-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+  .ys-parse-tab {
+    padding: 7px 18px; border-radius: 20px; font-size: 13px; font-weight: 500;
+    cursor: pointer; border: 1.5px solid var(--border); background: #fff; color: var(--text-secondary);
+    transition: all 0.2s;
+  }
+  .ys-parse-tab.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+  .ys-parse-textarea {
+    width: 100%; min-height: 180px; padding: 14px; border: 1.5px solid var(--border);
+    border-radius: 10px; font-size: 13px; font-family: inherit; resize: vertical;
+    transition: border 0.2s; background: #fff; line-height: 1.7;
+  }
+  .ys-parse-textarea:focus { outline: none; border-color: #63b3ed; box-shadow: 0 0 0 3px rgba(99,179,237,0.2); }
+  .ys-parse-textarea::placeholder { color: #a0aec0; }
+  .ys-parse-upload-area {
+    border: 2px dashed #63b3ed; border-radius: 10px; padding: 32px;
+    text-align: center; cursor: pointer; background: #fff; transition: all 0.2s;
+  }
+  .ys-parse-upload-area:hover { background: #ebf8ff; border-color: var(--primary); }
+  .ys-parse-upload-icon { font-size: 36px; margin-bottom: 8px; }
+  .ys-parse-upload-text { font-size: 14px; color: #4a5568; }
+  .ys-parse-upload-hint { font-size: 12px; color: #a0aec0; margin-top: 4px; }
+  .ys-parse-actions { display: flex; align-items: center; gap: 10px; margin-top: 14px; }
+  .ys-parse-result {
+    background: #fff; border: 1.5px solid #68d391; border-radius: 10px;
+    padding: 18px; margin-top: 14px;
+  }
+  .ys-parse-result-title { font-size: 14px; font-weight: 700; color: #276749; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+  .ys-parse-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 6px 0; border-bottom: 1px solid #f0fff4; font-size: 13px;
+  }
+  .ys-parse-item:last-child { border-bottom: none; }
+  .ys-parse-item-label { min-width: 100px; color: #4a5568; font-weight: 500; flex-shrink: 0; }
+  .ys-parse-item-value { color: var(--text); flex: 1; word-break: break-all; }
+  .ys-parse-item-value.highlight { color: var(--primary); font-weight: 600; }
+  .ys-parse-fill-btn {
+    margin-top: 14px; width: 100%;
+    padding: 12px; background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: #fff; border: none; border-radius: 10px; font-size: 14px; font-weight: 600;
+    cursor: pointer; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .ys-parse-fill-btn:hover { opacity: 0.9; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(26,54,93,0.25); }
+  .ys-parse-no-result { text-align: center; padding: 16px; color: #718096; font-size: 13px; }
+  .ys-parse-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; margin-left: 8px; }
+  .ys-parse-badge.identified { background: #c6f6d5; color: #276749; }
+  .ys-parse-badge.partial { background: #fefcbf; color: #744210; }
+</style>
+</head>
+<body>
+
+<div class="toast-container" id="toastContainer"></div>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-logo">
+    <h1>⚖ 律师办公平台</h1>
+    <p>专业 · 高效 · 规范</p>
+  </div>
+  <nav class="sidebar-nav" id="sidebarNav">
+    <div class="nav-item active" data-page="dashboard">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      仪表盘
+    </div>
+    <div class="nav-item" data-page="schedule">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      日程管理
+    </div>
+    <div class="nav-item" data-page="todos">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11l2 3h7a2 2 0 012 2z"/></svg>
+      待办事项
+    </div>
+    <div class="nav-item" data-page="cases">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg>
+      案件管理
+    </div>
+    <div class="nav-item" data-page="summary">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      工作总结
+    </div>
+    <div class="nav-item" data-page="reminders">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+      提醒中心
+    </div>
+    <div class="nav-item" data-page="tools">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06"/></svg>
+      工具箱
+    </div>
+    <div class="nav-item" data-page="yaosushi">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="11" x2="12" y2="17"/><line x1="9" y1="14" x2="15" y2="14"/></svg>
+      要素式诉状
+    </div>
+  </nav>
+  <div class="sidebar-footer">律师办公平台 v1.1</div>
+</aside>
+
+<div class="main">
+  <div class="mobile-header" style="height:56px;background:var(--primary);display:flex;align-items:center;padding:0 16px;color:#fff;">
+    <button onclick="toggleSidebar()" style="background:none;border:none;color:#fff;font-size:22px;margin-right:12px;cursor:pointer;">☰</button>
+    <span style="font-weight:600;">律师办公平台</span>
+  </div>
+
+  <header class="topbar">
+    <div class="topbar-title" id="pageTitle">仪表盘</div>
+    <div class="topbar-actions">
+      <div class="badge">
+        <button class="notify-btn" onclick="navigateTo('reminders')" title="提醒">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 01-3.46 0"/></svg>
+          <span class="badge-dot" id="reminderBadge" style="display:none;">0</span>
+        </button>
+      </div>
+      <button class="settings-btn" title="设置">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="content" id="contentArea"></div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" id="modalBox">
+    <div class="modal-header">
+      <div class="modal-title" id="modalTitle">标题</div>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer" id="modalFooter"></div>
+  </div>
+</div>
+
+<script>
+
+// ============ DATA LAYER ============
+var DB = {
+  _get: function(key) { try { return JSON.parse(localStorage.getItem(key)) || []; } catch(e) { return []; } },
+  _set: function(key, val) { localStorage.setItem(key, JSON.stringify(val)); },
+  genId: function() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 8); },
+
+  getSchedules: function() { return this._get('lp_schedules'); },
+  saveSchedules: function(d) { this._set('lp_schedules', d); },
+  addSchedule: function(item) { var d = this.getSchedules(); item.id = this.genId(); d.push(item); this.saveSchedules(d); return item; },
+  updateSchedule: function(id, item) { this.saveSchedules(this.getSchedules().map(function(s) { return s.id === id ? Object.assign({}, s, item) : s; })); },
+  deleteSchedule: function(id) { this.saveSchedules(this.getSchedules().filter(function(s) { return s.id !== id; })); },
+
+  getTodos: function() { return this._get('lp_todos'); },
+  saveTodos: function(d) { this._set('lp_todos', d); },
+  addTodo: function(item) { var d = this.getTodos(); item.id = this.genId(); item.done = false; item.createdAt = new Date().toISOString(); d.push(item); this.saveTodos(d); return item; },
+  updateTodo: function(id, item) { this.saveTodos(this.getTodos().map(function(t) { return t.id === id ? Object.assign({}, t, item) : t; })); },
+  deleteTodo: function(id) { this.saveTodos(this.getTodos().filter(function(t) { return t.id !== id; })); },
+
+  getCases: function() { return this._get('lp_cases'); },
+  saveCases: function(d) { this._set('lp_cases', d); },
+  addCase: function(item) { var d = this.getCases(); item.id = this.genId(); item.createdAt = new Date().toISOString(); d.push(item); this.saveCases(d); return item; },
+  updateCase: function(id, item) { this.saveCases(this.getCases().map(function(c) { return c.id === id ? Object.assign({}, c, item) : c; })); },
+  deleteCase: function(id) { this.saveCases(this.getCases().filter(function(c) { return c.id !== id; })); },
+
+  getReminders: function() { return this._get('lp_reminders'); },
+  saveReminders: function(d) { this._set('lp_reminders', d); },
+  addReminder: function(item) { var d = this.getReminders(); item.id = this.genId(); d.push(item); this.saveReminders(d); return item; },
+  updateReminder: function(id, item) { this.saveReminders(this.getReminders().map(function(r) { return r.id === id ? Object.assign({}, r, item) : r; })); },
+  deleteReminder: function(id) { this.saveReminders(this.getReminders().filter(function(r) { return r.id !== id; })); },
+
+  getTimers: function() { return this._get('lp_timers'); },
+  saveTimers: function(d) { this._set('lp_timers', d); },
+  addTimer: function(item) { var d = this.getTimers(); item.id = this.genId(); d.push(item); this.saveTimers(d); return item; },
+  deleteTimer: function(id) { this.saveTimers(this.getTimers().filter(function(t) { return t.id !== id; })); },
+
+  getContacts: function() { return this._get('lp_contacts'); },
+  saveContacts: function(d) { this._set('lp_contacts', d); },
+  addContact: function(item) { var d = this.getContacts(); item.id = this.genId(); d.push(item); this.saveContacts(d); return item; },
+  updateContact: function(id, item) { this.saveContacts(this.getContacts().map(function(c) { return c.id === id ? Object.assign({}, c, item) : c; })); },
+  deleteContact: function(id) { this.saveContacts(this.getContacts().filter(function(c) { return c.id !== id; })); },
+
+  getExpenses: function() { return this._get('lp_expenses'); },
+  saveExpenses: function(d) { this._set('lp_expenses', d); },
+  addExpense: function(item) { var d = this.getExpenses(); item.id = this.genId(); d.push(item); this.saveExpenses(d); return item; },
+  deleteExpense: function(id) { this.saveExpenses(this.getExpenses().filter(function(e) { return e.id !== id; })); }
+};
+
+// ============ UTILS ============
+function toast(msg, type) {
+  type = type || 'success';
+  var c = document.getElementById('toastContainer');
+  var t = document.createElement('div');
+  t.className = 'toast ' + type;
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(function() { t.style.opacity = '0'; setTimeout(function() { t.remove(); }, 300); }, 2500);
+}
+
+function esc(s) {
+  var d = document.createElement('div');
+  d.textContent = s || '';
+  return d.innerHTML;
+}
+
+function fmtDate(d) {
+  if (!d) return '-';
+  var dt = new Date(d);
+  return (dt.getMonth() + 1) + '/' + dt.getDate();
+}
+
+function fmtFull(d) {
+  if (!d) return '-';
+  var dt = new Date(d);
+  return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+}
+
+function isToday(d) {
+  if (!d) return false;
+  var t = new Date(d), n = new Date();
+  return t.getFullYear() === n.getFullYear() && t.getMonth() === n.getMonth() && t.getDate() === n.getDate();
+}
+
+function isThisWeek(d) {
+  if (!d) return false;
+  var t = new Date(d), n = new Date();
+  var start = new Date(n);
+  start.setDate(n.getDate() - n.getDay());
+  start.setHours(0, 0, 0, 0);
+  var end = new Date(start);
+  end.setDate(start.getDate() + 7);
+  return t >= start && t < end;
+}
+
+function daysDiff(a, b) {
+  return Math.ceil((new Date(a) - new Date(b)) / 86400000);
+}
+
+function moneyFormat(n) {
+  if (n === undefined || n === null) return '0.00';
+  return Number(n).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// ============ NAVIGATION ============
+var currentPage = 'dashboard';
+var pageTitles = {
+  dashboard: '仪表盘', schedule: '日程管理', todos: '待办事项',
+  cases: '案件管理', summary: '工作总结', reminders: '提醒中心', tools: '工具箱', yaosushi: '要素式诉状生成器'
+};
+
+function navigateTo(page) {
+  currentPage = page;
+  document.getElementById('pageTitle').textContent = pageTitles[page] || '';
+  document.querySelectorAll('.nav-item').forEach(function(el) {
+    el.classList.toggle('active', el.dataset.page === page);
+  });
+  renderPage();
+  document.getElementById('sidebar').classList.remove('open');
+}
+
+function toggleSidebar() {
+  document.getElementById('sidebar').classList.toggle('open');
+}
+
+// ============ MODAL ============
+function openModal(title, bodyHtml, footerHtml) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = bodyHtml;
+  document.getElementById('modalFooter').innerHTML = footerHtml || '';
+  document.getElementById('modalOverlay').classList.add('active');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('active');
+}
+
+// ============ INIT ============
+document.addEventListener('DOMContentLoaded', function() {
+  document.querySelectorAll('.nav-item').forEach(function(el) {
+    el.addEventListener('click', function() { navigateTo(el.dataset.page); });
+  });
+  document.getElementById('modalOverlay').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+  });
+  navigateTo('dashboard');
+  updateReminderBadge();
+});
+
+function updateReminderBadge() {
+  var count = DB.getReminders().filter(function(r) {
+    var d = daysDiff(r.deadline, new Date().toISOString().slice(0, 10));
+    return d <= 7;
+  }).length;
+  var badge = document.getElementById('reminderBadge');
+  if (count > 0) { badge.textContent = count; badge.style.display = 'flex'; }
+  else { badge.style.display = 'none'; }
+}
+
+// ============ RENDER ROUTER ============
+function renderPage() {
+  var area = document.getElementById('contentArea');
+  switch (currentPage) {
+    case 'dashboard': area.innerHTML = renderDashboard(); break;
+    case 'schedule': area.innerHTML = renderSchedule(); initCalendar(); break;
+    case 'todos': area.innerHTML = renderTodos(); initTodos(); break;
+    case 'cases': area.innerHTML = renderCases(); initCases(); break;
+    case 'summary': area.innerHTML = renderSummary(); initSummary(); break;
+    case 'reminders': area.innerHTML = renderReminders(); initReminders(); break;
+    case 'tools': area.innerHTML = renderTools(); initTools(); break;
+    case 'yaosushi': renderYaosushi(); break;
+  }
+  updateReminderBadge();
+}
+
+// ============ DASHBOARD ============
+function renderDashboard() {
+  var today = new Date().toISOString().slice(0, 10);
+  var todaySchedules = DB.getSchedules().filter(function(s) { return s.date === today; });
+  var pendingTodos = DB.getTodos().filter(function(t) { return !t.done; });
+  var activeCases = DB.getCases().filter(function(c) { return c.status === '代理中'; });
+  var urgentReminders = DB.getReminders().filter(function(r) { return daysDiff(r.deadline, today) <= 7; });
+
+  var h = '';
+  // Stats
+  h += '<div class="stats-grid">';
+  h += '<div class="stat-card blue"><div class="stat-label">今日日程</div><div class="stat-number">' + todaySchedules.length + '</div></div>';
+  h += '<div class="stat-card red"><div class="stat-label">待办事项</div><div class="stat-number">' + pendingTodos.length + '</div></div>';
+  h += '<div class="stat-card green"><div class="stat-label">进行中案件</div><div class="stat-number">' + activeCases.length + '</div></div>';
+  h += '<div class="stat-card yellow"><div class="stat-label">即将到期</div><div class="stat-number">' + urgentReminders.length + '</div></div>';
+  h += '</div>';
+
+  // Main content row
+  h += '<div style="display:flex;gap:20px;flex-wrap:wrap;">';
+
+  // Today's schedules
+  h += '<div class="card" style="flex:2;min-width:300px;">';
+  h += '<div class="card-header"><div class="card-title">今日日程</div>';
+  h += '<button class="btn btn-primary btn-sm" onclick="openAddScheduleForDay()">+ 添加</button></div>';
+  if (todaySchedules.length === 0) {
+    h += '<p style="color:var(--text-secondary);font-size:14px;padding:20px 0;text-align:center;">今日暂无日程安排</p>';
+  } else {
+    todaySchedules.sort(function(a, b) { return (a.time || '').localeCompare(b.time || ''); });
+    for (var i = 0; i < todaySchedules.length; i++) {
+      var s = todaySchedules[i];
+      var typeClass = s.type === '开庭' ? 'court' : (s.type === '会见' || s.type === '会议' ? 'meeting' : (s.type === '截止日' ? 'deadline' : 'other'));
+      h += '<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border);">';
+      h += '<span style="font-weight:600;color:var(--primary);min-width:50px;">' + esc(s.time || '') + '</span>';
+      h += '<span class="cal-event ' + typeClass + '">' + esc(s.type || '其他') + '</span>';
+      h += '<span style="flex:1;">' + esc(s.title || '') + '</span>';
+      h += '<button class="btn btn-sm btn-outline" onclick="deleteSchedule(\'' + s.id + '\')">删除</button>';
+      h += '</div>';
+    }
+  }
+  h += '</div>';
+
+  // Right column
+  h += '<div style="flex:1;min-width:260px;display:flex;flex-direction:column;gap:20px;">';
+
+  // Pending todos
+  h += '<div class="card">';
+  h += '<div class="card-header"><div class="card-title">待办事项</div>';
+  h += '<button class="btn btn-primary btn-sm" onclick="navigateTo(\'todos\')">查看全部</button></div>';
+  var showTodos = pendingTodos.slice(0, 5);
+  if (showTodos.length === 0) {
+    h += '<p style="color:var(--text-secondary);font-size:14px;padding:10px 0;text-align:center;">暂无待办</p>';
+  } else {
+    for (var j = 0; j < showTodos.length; j++) {
+      var t = showTodos[j];
+      var pColor = t.priority === '紧急' ? 'var(--accent)' : (t.priority === '高' ? '#dd6b20' : (t.priority === '中' ? 'var(--warning)' : 'var(--success)'));
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;">';
+      h += '<input type="checkbox" onchange="toggleTodo(\'' + t.id + '\')" style="cursor:pointer;">';
+      h += '<span style="flex:1;' + (t.done ? 'text-decoration:line-through;opacity:0.5;' : '') + '">' + esc(t.title || '') + '</span>';
+      h += '<span class="tag" style="background:' + pColor + '15;color:' + pColor + ';">' + esc(t.priority || '中') + '</span>';
+      h += '</div>';
+    }
+  }
+  h += '</div>';
+
+  // Urgent reminders
+  h += '<div class="card">';
+  h += '<div class="card-header"><div class="card-title">即将到期提醒</div>';
+  h += '<button class="btn btn-primary btn-sm" onclick="navigateTo(\'reminders\')">查看全部</button></div>';
+  if (urgentReminders.length === 0) {
+    h += '<p style="color:var(--text-secondary);font-size:14px;padding:10px 0;text-align:center;">暂无紧急提醒</p>';
+  } else {
+    for (var k = 0; k < Math.min(urgentReminders.length, 4); k++) {
+      var r = urgentReminders[k];
+      var d = daysDiff(r.deadline, today);
+      var dText = d < 0 ? '<span style="color:var(--accent);">已过期' + Math.abs(d) + '天</span>' : '<span style="color:var(--warning);">剩余' + d + '天</span>';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);font-size:13px;">';
+      h += '<span>' + esc(r.title || '') + '</span>' + dText;
+      h += '</div>';
+    }
+  }
+  h += '</div>';
+
+  h += '</div></div>';
+  return h;
+}
+
+function openAddScheduleForDay() {
+  var today = new Date().toISOString().slice(0, 10);
+  openAddSchedule(today);
+}
+
+// ============ SCHEDULE ============
+var calState = { year: new Date().getFullYear(), month: new Date().getMonth(), selectedDate: new Date().toISOString().slice(0, 10) };
+
+function renderSchedule() {
+  var y = calState.year, m = calState.month;
+  var monthNames = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  var h = '<div class="card">';
+  h += '<div class="calendar-header">';
+  h += '<button class="btn btn-outline btn-sm" id="calPrev" onclick="calNav(-1)">&lt; 上月</button>';
+  h += '<span style="font-size:16px;font-weight:600;" id="calTitle">' + y + '年' + monthNames[m] + '</span>';
+  h += '<div><button class="btn btn-outline btn-sm" id="calNext" onclick="calNav(1)">下月 &gt;</button> ';
+  h += '<button class="btn btn-primary btn-sm" onclick="openAddSchedule()">+ 添加日程</button></div>';
+  h += '</div>';
+
+  var dayNames = ['日','一','二','三','四','五','六'];
+  h += '<div class="calendar-grid">';
+  for (var d = 0; d < 7; d++) { h += '<div class="cal-day-header">' + dayNames[d] + '</div>'; }
+
+  var firstDay = new Date(y, m, 1).getDay();
+  var daysInMonth = new Date(y, m + 1, 0).getDate();
+  var prevDays = new Date(y, m, 0).getDate();
+  var todayStr = new Date().toISOString().slice(0, 10);
+  var schedules = DB.getSchedules();
+
+  // Previous month days
+  for (var p = firstDay - 1; p >= 0; p--) {
+    h += '<div class="cal-day other-month"><div class="cal-day-num">' + (prevDays - p) + '</div></div>';
+  }
+  // Current month days
+  for (var day = 1; day <= daysInMonth; day++) {
+    var dateStr = y + '-' + String(m + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+    var isT = dateStr === todayStr;
+    var dayScheds = schedules.filter(function(s) { return s.date === dateStr; });
+    h += '<div class="cal-day' + (isT ? ' today' : '') + '" onclick="selectDate(\'' + dateStr + '\')">';
+    h += '<div class="cal-day-num">' + day + '</div>';
+    for (var ei = 0; ei < Math.min(dayScheds.length, 2); ei++) {
+      var ev = dayScheds[ei];
+      var tc = ev.type === '开庭' ? 'court' : (ev.type === '会见' || ev.type === '会议' ? 'meeting' : (ev.type === '截止日' ? 'deadline' : 'other'));
+      h += '<div class="cal-event ' + tc + '">' + esc(ev.title || ev.type || '') + '</div>';
+    }
+    if (dayScheds.length > 2) { h += '<div class="cal-event other">+' + (dayScheds.length - 2) + ' more</div>'; }
+    h += '</div>';
+  }
+  // Next month days
+  var totalCells = firstDay + daysInMonth;
+  var remain = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+  for (var n = 1; n <= remain; n++) {
+    h += '<div class="cal-day other-month"><div class="cal-day-num">' + n + '</div></div>';
+  }
+  h += '</div></div>';
+
+  // Selected date list
+  h += '<div class="card" style="margin-top:20px;" id="dayScheduleCard">';
+  h += '<div class="card-header"><div class="card-title" id="dayScheduleTitle">' + calState.selectedDate + ' 日程</div>';
+  h += '<button class="btn btn-primary btn-sm" onclick="openAddSchedule(\'' + calState.selectedDate + '\')">+ 添加</button></div>';
+  h += '<div id="dayScheduleList"></div></div>';
+  return h;
+}
+
+function initCalendar() {
+  renderDayList();
+}
+
+function calNav(dir) {
+  calState.month += dir;
+  if (calState.month > 11) { calState.month = 0; calState.year++; }
+  if (calState.month < 0) { calState.month = 11; calState.year--; }
+  document.getElementById('contentArea').innerHTML = renderSchedule();
+  initCalendar();
+}
+
+function selectDate(dateStr) {
+  calState.selectedDate = dateStr;
+  document.getElementById('dayScheduleTitle').textContent = dateStr + ' 日程';
+  renderDayList();
+}
+
+function renderDayList() {
+  var list = document.getElementById('dayScheduleList');
+  if (!list) return;
+  var items = DB.getSchedules().filter(function(s) { return s.date === calState.selectedDate; });
+  if (items.length === 0) {
+    list.innerHTML = '<p style="color:var(--text-secondary);padding:16px;text-align:center;">当日暂无日程</p>';
+    return;
+  }
+  var h = '';
+  items.sort(function(a, b) { return (a.time || '').localeCompare(b.time || ''); });
+  for (var i = 0; i < items.length; i++) {
+    var s = items[i];
+    var tc = s.type === '开庭' ? 'court' : (s.type === '会见' || s.type === '会议' ? 'meeting' : (s.type === '截止日' ? 'deadline' : 'other'));
+    h += '<div style="display:flex;align-items:center;gap:12px;padding:10px;border-bottom:1px solid var(--border);">';
+    h += '<span style="font-weight:600;color:var(--primary);min-width:60px;">' + esc(s.time || '--:--') + '</span>';
+    h += '<span class="cal-event ' + tc + '" style="min-width:50px;">' + esc(s.type || '其他') + '</span>';
+    h += '<span style="flex:1;">' + esc(s.title || '') + '</span>';
+    if (s.note) h += '<span style="color:var(--text-secondary);font-size:12px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(s.note) + '</span>';
+    h += '<button class="btn btn-sm btn-outline" onclick="openEditSchedule(\'' + s.id + '\')">编辑</button>';
+    h += '<button class="btn btn-sm btn-danger" onclick="confirmDeleteSchedule(\'' + s.id + '\')">删除</button>';
+    h += '</div>';
+  }
+  list.innerHTML = h;
+}
+
+function caseOptions(selectedId) {
+  var cases = DB.getCases();
+  var h = '<option value="">-- 选择案件 --</option>';
+  for (var i = 0; i < cases.length; i++) {
+    h += '<option value="' + cases[i].id + '"' + (cases[i].id === selectedId ? ' selected' : '') + '>' + esc(cases[i].name || cases[i].caseNo || '') + '</option>';
+  }
+  return h;
+}
+
+function openAddSchedule(date) {
+  date = date || calState.selectedDate || new Date().toISOString().slice(0, 10);
+  var body = '<div class="form-group"><label class="form-label">标题</label><input class="form-input" id="schedTitle" placeholder="如：张三诉李四开庭"></div>';
+  body += '<div class="form-group"><label class="form-label">日期</label><input class="form-input" type="date" id="schedDate" value="' + date + '"></div>';
+  body += '<div class="form-group"><label class="form-label">时间</label><input class="form-input" type="time" id="schedTime" value="09:00"></div>';
+  body += '<div class="form-group"><label class="form-label">类型</label><select class="form-select" id="schedType"><option>开庭</option><option>会见</option><option>会议</option><option>截止日</option><option>其他</option></select></div>';
+  body += '<div class="form-group"><label class="form-label">关联案件</label><select class="form-select" id="schedCase">' + caseOptions() + '</select></div>';
+  body += '<div class="form-group"><label class="form-label">备注</label><textarea class="form-textarea" id="schedNote" rows="2"></textarea></div>';
+  var footer = '<button class="btn btn-outline" onclick="closeModal()">取消</button>';
+  footer += '<button class="btn btn-primary" onclick="saveNewSchedule()">保存</button>';
+  openModal('添加日程', body, footer);
+}
+
+function saveNewSchedule() {
+  var title = document.getElementById('schedTitle').value.trim();
+  if (!title) { toast('请输入标题', 'error'); return; }
+  DB.addSchedule({
+    title: title,
+    date: document.getElementById('schedDate').value,
+    time: document.getElementById('schedTime').value,
+    type: document.getElementById('schedType').value,
+    caseId: document.getElementById('schedCase').value,
+    note: document.getElementById('schedNote').value
+  });
+  closeModal();
+  toast('日程已添加');
+  renderPage();
+}
+
+function openEditSchedule(id) {
+  var s = DB.getSchedules().find(function(x) { return x.id === id; });
+  if (!s) return;
+  var body = '<div class="form-group"><label class="form-label">标题</label><input class="form-input" id="schedTitle" value="' + esc(s.title) + '"></div>';
+  body += '<div class="form-group"><label class="form-label">日期</label><input class="form-input" type="date" id="schedDate" value="' + (s.date || '') + '"></div>';
+  body += '<div class="form-group"><label class="form-label">时间</label><input class="form-input" type="time" id="schedTime" value="' + (s.time || '') + '"></div>';
+  body += '<div class="form-group"><label class="form-label">类型</label><select class="form-select" id="schedType">';
+  ['开庭','会见','会议','截止日','其他'].forEach(function(t) { body += '<option' + (s.type === t ? ' selected' : '') + '>' + t + '</option>'; });
+  body += '</select></div>';
+  body += '<div class="form-group"><label class="form-label">关联案件</label><select class="form-select" id="schedCase">' + caseOptions(s.caseId) + '</select></div>';
+  body += '<div class="form-group"><label class="form-label">备注</label><textarea class="form-textarea" id="schedNote" rows="2">' + esc(s.note || '') + '</textarea></div>';
+  var footer = '<button class="btn btn-outline" onclick="closeModal()">取消</button>';
+  footer += '<button class="btn btn-primary" onclick="saveEditSchedule(\'' + id + '\')">保存</button>';
+  openModal('编辑日程', body, footer);
+}
+
+function saveEditSchedule(id) {
+  var title = document.getElementById('schedTitle').value.trim();
+  if (!title) { toast('请输入标题', 'error'); return; }
+  DB.updateSchedule(id, {
+    title: title,
+    date: document.getElementById('schedDate').value,
+    time: document.getElementById('schedTime').value,
+    type: document.getElementById('schedType').value,
+    caseId: document.getElementById('schedCase').value,
+    note: document.getElementById('schedNote').value
+  });
+  closeModal();
+  toast('日程已更新');
+  renderPage();
+}
+
+function confirmDeleteSchedule(id) {
+  if (confirm('确定删除该日程？')) { deleteSchedule(id); }
+}
+
+function deleteSchedule(id) {
+  DB.deleteSchedule(id);
+  toast('日程已删除');
+  renderPage();
+}
+
+// ============ TODOS ============
+var todoFilter = 'all';
+var todoPriority = 'all';
+
+function renderTodos() {
+  var h = '<div class="card">';
+  h += '<div class="card-header"><div style="display:flex;gap:8px;">';
+  ['all', 'pending', 'done'].forEach(function(f) {
+    var label = f === 'all' ? '全部' : (f === 'pending' ? '未完成' : '已完成');
+    var active = todoFilter === f ? ' active' : '';
+    h += '<div class="tab' + active + '" onclick="setTodoFilter(\'' + f + '\')">' + label + '</div>';
+  });
+  h += '</div>';
+  h += '<button class="btn btn-primary btn-sm" onclick="openAddTodo()">+ 添加待办</button></div>';
+  h += '<div style="display:flex;gap:6px;margin-bottom:16px;">';
+  var prLabels = { all: '全部', '紧急': '紧急', '高': '高', '中': '中', '低': '低' };
+  var prColors = { all: 'var(--text-secondary)', '紧急': 'var(--accent)', '高': '#dd6b20', '中': 'var(--warning)', '低': 'var(--success)' };
+  Object.keys(prLabels).forEach(function(p) {
+    var act = todoPriority === p ? 'font-weight:700;border:1px solid ' + prColors[p] : 'border:1px solid var(--border);';
+    h += '<button class="btn btn-sm" style="' + act + 'color:' + prColors[p] + ';background:transparent;" onclick="setTodoPriority(\'' + p + '\')">' + prLabels[p] + '</button>';
+  });
+  h += '</div>';
+  h += '<div id="todoList"></div></div>';
+  return h;
+}
+
+function initTodos() { renderTodoList(); }
+
+function setTodoFilter(f) { todoFilter = f; initTodos(); }
+function setTodoPriority(p) { todoPriority = p; initTodos(); }
+
+function renderTodoList() {
+  var list = document.getElementById('todoList');
+  if (!list) return;
+  var todos = DB.getTodos();
+  if (todoFilter === 'pending') todos = todos.filter(function(t) { return !t.done; });
+  if (todoFilter === 'done') todos = todos.filter(function(t) { return t.done; });
+  if (todoPriority !== 'all') todos = todos.filter(function(t) { return t.priority === todoPriority; });
+
+  if (todos.length === 0) {
+    list.innerHTML = '<p style="color:var(--text-secondary);padding:30px;text-align:center;">暂无待办事项</p>';
+    return;
+  }
+  var h = '';
+  var pBorders = { '紧急': 'var(--accent)', '高': '#dd6b20', '中': 'var(--warning)', '低': 'var(--success)' };
+  for (var i = 0; i < todos.length; i++) {
+    var t = todos[i];
+    var borderC = pBorders[t.priority] || 'var(--border)';
+    h += '<div style="display:flex;align-items:center;gap:12px;padding:12px;border-bottom:1px solid var(--border);border-left:4px solid ' + borderC + ';' + (t.done ? 'opacity:0.5;' : '') + '">';
+    h += '<input type="checkbox"' + (t.done ? ' checked' : '') + ' onchange="toggleTodo(\'' + t.id + '\')" style="cursor:pointer;width:18px;height:18px;">';
+    h += '<div style="flex:1;">';
+    h += '<div style="font-size:14px;' + (t.done ? 'text-decoration:line-through;' : '') + '">' + esc(t.title) + '</div>';
+    if (t.dueDate) h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">截止: ' + t.dueDate + '</div>';
+    h += '</div>';
+    if (t.priority) {
+      var pc = pBorders[t.priority] || 'var(--text-secondary)';
+      h += '<span class="tag" style="background:' + pc + '15;color:' + pc + ';">' + esc(t.priority) + '</span>';
+    }
+    h += '<button class="btn btn-sm btn-outline" onclick="openEditTodo(\'' + t.id + '\')">编辑</button>';
+    h += '<button class="btn btn-sm btn-danger" onclick="confirmDeleteTodo(\'' + t.id + '\')">删除</button>';
+    h += '</div>';
+  }
+  list.innerHTML = h;
+}
+
+function toggleTodo(id) {
+  var t = DB.getTodos().find(function(x) { return x.id === id; });
+  if (t) { DB.updateTodo(id, { done: !t.done }); renderPage(); }
+}
+
+function openAddTodo() {
+  var body = '<div class="form-group"><label class="form-label">标题</label><input class="form-input" id="todoTitle" placeholder="输入待办事项"></div>';
+  body += '<div class="form-group"><label class="form-label">优先级</label><select class="form-select" id="todoPriority"><option>中</option><option>低</option><option>高</option><option>紧急</option></select></div>';
+  body += '<div class="form-group"><label class="form-label">截止日期</label><input class="form-input" type="date" id="todoDueDate"></div>';
+  body += '<div class="form-group"><label class="form-label">关联案件</label><select class="form-select" id="todoCase">' + caseOptions() + '</select></div>';
+  body += '<div class="form-group"><label class="form-label">备注</label><textarea class="form-textarea" id="todoNote" rows="2"></textarea></div>';
+  openModal('添加待办', body, '<button class="btn btn-outline" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveNewTodo()">保存</button>');
+}
+
+function saveNewTodo() {
+  var title = document.getElementById('todoTitle').value.trim();
+  if (!title) { toast('请输入标题', 'error'); return; }
+  DB.addTodo({ title: title, priority: document.getElementById('todoPriority').value, dueDate: document.getElementById('todoDueDate').value, caseId: document.getElementById('todoCase').value, note: document.getElementById('todoNote').value });
+  closeModal(); toast('待办已添加'); renderPage();
+}
+
+function openEditTodo(id) {
+  var t = DB.getTodos().find(function(x) { return x.id === id; });
+  if (!t) return;
+  var body = '<div class="form-group"><label class="form-label">标题</label><input class="form-input" id="todoTitle" value="' + esc(t.title) + '"></div>';
+  body += '<div class="form-group"><label class="form-label">优先级</label><select class="form-select" id="todoPriority">';
+  ['低','中','高','紧急'].forEach(function(p) { body += '<option' + (t.priority === p ? ' selected' : '') + '>' + p + '</option>'; });
+  body += '</select></div>';
+  body += '<div class="form-group"><label class="form-label">截止日期</label><input class="form-input" type="date" id="todoDueDate" value="' + (t.dueDate || '') + '"></div>';
+  body += '<div class="form-group"><label class="form-label">关联案件</label><select class="form-select" id="todoCase">' + caseOptions(t.caseId) + '</select></div>';
+  body += '<div class="form-group"><label class="form-label">备注</label><textarea class="form-textarea" id="todoNote" rows="2">' + esc(t.note || '') + '</textarea></div>';
+  openModal('编辑待办', body, '<button class="btn btn-outline" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveEditTodo(\'' + id + '\')">保存</button>');
+}
+
+function saveEditTodo(id) {
+  var title = document.getElementById('todoTitle').value.trim();
+  if (!title) { toast('请输入标题', 'error'); return; }
+  DB.updateTodo(id, { title: title, priority: document.getElementById('todoPriority').value, dueDate: document.getElementById('todoDueDate').value, caseId: document.getElementById('todoCase').value, note: document.getElementById('todoNote').value });
+  closeModal(); toast('待办已更新'); renderPage();
+}
+
+function confirmDeleteTodo(id) { if (confirm('确定删除？')) { DB.deleteTodo(id); toast('已删除'); renderPage(); } }
+
+// ============ CASES ============
+var caseSearch = '';
+
+function renderCases() {
+  var cases = DB.getCases();
+  var active = cases.filter(function(c) { return c.status === '代理中'; }).length;
+  var closed = cases.filter(function(c) { return c.status === '已结案'; }).length;
+  var pending = cases.filter(function(c) { return c.status === '待立案'; }).length;
+
+  var h = '<div class="stats-grid" style="margin-bottom:20px;">';
+  h += '<div class="stat-card blue"><div class="stat-label">代理中</div><div class="stat-number">' + active + '</div></div>';
+  h += '<div class="stat-card green"><div class="stat-label">已结案</div><div class="stat-number">' + closed + '</div></div>';
+  h += '<div class="stat-card yellow"><div class="stat-label">待立案</div><div class="stat-number">' + pending + '</div></div>';
+  h += '<div class="stat-card red"><div class="stat-label">全部案件</div><div class="stat-number">' + cases.length + '</div></div>';
+  h += '</div>';
+
+  h += '<div class="card">';
+  h += '<div class="card-header"><input class="form-input" style="max-width:300px;" placeholder="搜索案件名称/案号..." id="caseSearchInput" oninput="searchCases(this.value)">';
+  h += '<button class="btn btn-primary btn-sm" onclick="openAddCase()">+ 添加案件</button></div>';
+  h += '<div id="caseList"></div></div>';
+  return h;
+}
+
+function initCases() { renderCaseList(); }
+
+function searchCases(kw) { caseSearch = kw; renderCaseList(); }
+
+function renderCaseList() {
+  var list = document.getElementById('caseList');
+  if (!list) return;
+  var cases = DB.getCases();
+  if (caseSearch) {
+    var kw = caseSearch.toLowerCase();
+    cases = cases.filter(function(c) { return (c.name || '').toLowerCase().indexOf(kw) >= 0 || (c.caseNo || '').toLowerCase().indexOf(kw) >= 0; });
+  }
+  if (cases.length === 0) {
+    list.innerHTML = '<p style="color:var(--text-secondary);padding:30px;text-align:center;">暂无案件</p>';
+    return;
+  }
+  var h = '<div class="table-wrap"><table class="table"><thead><tr><th>案件名称</th><th>案号</th><th>当事人</th><th>类型</th><th>状态</th><th>操作</th></tr></thead><tbody>';
+  var statusTag = { '待立案': 'tag-yellow', '代理中': 'tag-blue', '已结案': 'tag-green', '已撤案': 'tag-gray' };
+  for (var i = 0; i < cases.length; i++) {
+    var c = cases[i];
+    h += '<tr>';
+    h += '<td style="font-weight:500;cursor:pointer;" onclick="openCaseDetail(\'' + c.id + '\')">' + esc(c.name || '') + '</td>';
+    h += '<td>' + esc(c.caseNo || '-') + '</td>';
+    h += '<td>' + esc(c.client || '-') + '</td>';
+    h += '<td><span class="tag tag-purple">' + esc(c.type || '-') + '</span></td>';
+    h += '<td><span class="tag ' + (statusTag[c.status] || 'tag-gray') + '">' + esc(c.status || '-') + '</span></td>';
+    h += '<td><button class="btn btn-sm btn-outline" onclick="openEditCase(\'' + c.id + '\')">编辑</button> ';
+    h += '<button class="btn btn-sm btn-danger" onclick="confirmDeleteCase(\'' + c.id + '\')">删除</button></td>';
+    h += '</tr>';
+  }
+  h += '</tbody></table></div>';
+  list.innerHTML = h;
+}
+
+function openCaseDetail(id) {
+  var c = DB.getCases().find(function(x) { return x.id === id; });
+  if (!c) return;
+  var body = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:14px;">';
+  body += '<div><strong>案件名称：</strong>' + esc(c.name) + '</div>';
+  body += '<div><strong>案号：</strong>' + esc(c.caseNo || '-') + '</div>';
+  body += '<div><strong>当事人：</strong>' + esc(c.client || '-') + '</div>';
+  body += '<div><strong>对方当事人：</strong>' + esc(c.opponent || '-') + '</div>';
+  body += '<div><strong>案件类型：</strong>' + esc(c.type || '-') + '</div>';
+  body += '<div><strong>案件状态：</strong>' + esc(c.status || '-') + '</div>';
+  body += '<div><strong>代理阶段：</strong>' + esc(c.stage || '-') + '</div>';
+  body += '<div><strong>争议金额：</strong>' + (c.amount ? moneyFormat(c.amount) + ' 元' : '-') + '</div>';
+  body += '<div><strong>立案日期：</strong>' + fmtFull(c.fileDate) + '</div>';
+  body += '<div><strong>预计结案：</strong>' + fmtFull(c.expectDate) + '</div>';
+  body += '</div>';
+  if (c.note) body += '<div style="margin-top:14px;font-size:14px;"><strong>备注：</strong>' + esc(c.note) + '</div>';
+
+  // Related schedules
+  var relScheds = DB.getSchedules().filter(function(s) { return s.caseId === id; });
+  if (relScheds.length > 0) {
+    body += '<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);"><strong>相关日程：</strong></div>';
+    for (var i = 0; i < relScheds.length; i++) {
+      body += '<div style="font-size:13px;padding:4px 0;">' + fmtFull(relScheds[i].date) + ' ' + esc(relScheds[i].time || '') + ' - ' + esc(relScheds[i].title) + '</div>';
+    }
+  }
+
+  openModal('案件详情', body, '<button class="btn btn-outline" onclick="closeModal()">关闭</button><button class="btn btn-primary" onclick="closeModal();openEditCase(\'' + id + '\')">编辑</button>');
+}
+
+function openAddCase() {
+  var body = '<div class="form-group"><label class="form-label">案件名称</label><input class="form-input" id="caseName"></div>';
+  body += '<div class="form-group"><label class="form-label">案号</label><input class="form-input" id="caseNo" placeholder="如：(2026)京0101民初xxx号"></div>';
+  body += '<div class="form-group"><label class="form-label">当事人</label><input class="form-input" id="caseClient"></div>';
+  body += '<div class="form-group"><label class="form-label">对方当事人</label><input class="form-input" id="caseOpponent"></div>';
+  body += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">';
+  body += '<div class="form-group"><label class="form-label">案件类型</label><select class="form-select" id="caseType"><option>民事</option><option>刑事</option><option>行政</option><option>非诉</option></select></div>';
+  body += '<div class="form-group"><label class="form-label">案件状态</label><select class="form-select" id="caseStatus"><option>待立案</option><option>代理中</option><option>已结案</option><option>已撤案</option></select></div>';
+  body += '</div>';
+  body += '<div class="form-group"><label class="form-label">代理阶段</label><select class="form-select" id="caseStage"><option>一审</option><option>二审</option><option>再审</option><option>执行</option><option>仲裁</option></select></div>';
+  body += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">';
+  body += '<div class="form-group"><label class="form-label">立案日期</label><input class="form-input" type="date" id="caseFileDate"></div>';
+  body += '<div class="form-group"><label class="form-label">预计结案日期</label><input class="form-input" type="date" id="caseExpectDate"></div>';
+  body += '</div>';
+  body += '<div class="form-group"><label class="form-label">争议金额（元）</label><input class="form-input" type="number" id="caseAmount" placeholder="0.00"></div>';
+  body += '<div class="form-group"><label class="form-label">备注</label><textarea class="form-textarea" id="caseNote" rows="2"></textarea></div>';
+  openModal('添加案件', body, '<button class="btn btn-outline" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveNewCase()">保存</button>');
+}
+
+function saveNewCase() {
+  var name = document.getElementById('caseName').value.trim();
+  if (!name) { toast('请输入案件名称', 'error'); return; }
+  DB.addCase({ name: name, caseNo: document.getElementById('caseNo').value.trim(), client: document.getElementById('caseClient').value.trim(), opponent: document.getElementById('caseOpponent').value.trim(), type: document.getElementById('caseType').value, status: document.getElementById('caseStatus').value, stage: document.getElementById('caseStage').value, fileDate: document.getElementById('caseFileDate').value, expectDate: document.getElementById('caseExpectDate').value, amount: document.getElementById('caseAmount').value, note: document.getElementById('caseNote').value });
+  closeModal(); toast('案件已添加'); renderPage();
+}
+
+function openEditCase(id) {
+  var c = DB.getCases().find(function(x) { return x.id === id; });
+  if (!c) return;
+  var body = '<div class="form-group"><label class="form-label">案件名称</label><input class="form-input" id="caseName" value="' + esc(c.name) + '"></div>';
+  body += '<div class="form-group"><label class="form-label">案号</label><input class="form-input" id="caseNo" value="' + esc(c.caseNo || '') + '"></div>';
+  body += '<div class="form-group"><label class="form-label">当事人</label><input class="form-input" id="caseClient" value="' + esc(c.client || '') + '"></div>';
+  body += '<div class="form-group"><label class="form-label">对方当事人</label><input class="form-input" id="caseOpponent" value="' + esc(c.opponent || '') + '"></div>';
+  body += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">';
+  body += '<div class="form-group"><label class="form-label">案件类型</label><select class="form-select" id="caseType">';
+  ['民事','刑事','行政','非诉'].forEach(function(t) { body += '<option' + (c.type === t ? ' selected' : '') + '>' + t + '</option>'; });
+  body += '</select></div>';
+  body += '<div class="form-group"><label class="form-label">案件状态</label><select class="form-select" id="caseStatus">';
+  ['待立案','代理中','已结案','已撤案'].forEach(function(s) { body += '<option' + (c.status === s ? ' selected' : '') + '>' + s + '</option>'; });
+  body += '</select></div></div>';
+  body += '<div class="form-group"><label class="form-label">代理阶段</label><select class="form-select" id="caseStage">';
+  ['一审','二审','再审','执行','仲裁'].forEach(function(s) { body += '<option' + (c.stage === s ? ' selected' : '') + '>' + s + '</option>'; });
+  body += '</select></div>';
+  body += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">';
+  body += '<div class="form-group"><label class="form-label">立案日期</label><input class="form-input" type="date" id="caseFileDate" value="' + (c.fileDate || '') + '"></div>';
+  body += '<div class="form-group"><label class="form-label">预计结案日期</label><input class="form-input" type="date" id="caseExpectDate" value="' + (c.expectDate || '') + '"></div></div>';
+  body += '<div class="form-group"><label class="form-label">争议金额（元）</label><input class="form-input" type="number" id="caseAmount" value="' + (c.amount || '') + '"></div>';
+  body += '<div class="form-group"><label class="form-label">备注</label><textarea class="form-textarea" id="caseNote" rows="2">' + esc(c.note || '') + '</textarea></div>';
+  openModal('编辑案件', body, '<button class="btn btn-outline" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveEditCase(\'' + id + '\')">保存</button>');
+}
+
+function saveEditCase(id) {
+  var name = document.getElementById('caseName').value.trim();
+  if (!name) { toast('请输入案件名称', 'error'); return; }
+  DB.updateCase(id, { name: name, caseNo: document.getElementById('caseNo').value.trim(), client: document.getElementById('caseClient').value.trim(), opponent: document.getElementById('caseOpponent').value.trim(), type: document.getElementById('caseType').value, status: document.getElementById('caseStatus').value, stage: document.getElementById('caseStage').value, fileDate: document.getElementById('caseFileDate').value, expectDate: document.getElementById('caseExpectDate').value, amount: document.getElementById('caseAmount').value, note: document.getElementById('caseNote').value });
+  closeModal(); toast('案件已更新'); renderPage();
+}
+
+function confirmDeleteCase(id) { if (confirm('确定删除该案件？此操作不可恢复。')) { DB.deleteCase(id); toast('已删除'); renderPage(); } }
+
+// ============ REMINDERS ============
+var reminderFilter = 'all';
+
+function renderReminders() {
+  var h = '<div class="card">';
+  h += '<div class="card-header"><div style="display:flex;gap:8px;">';
+  var filters = [['all', '全部'], ['urgent', '紧急'], ['warning', '即将到期'], ['normal', '正常']];
+  for (var i = 0; i < filters.length; i++) {
+    var f = filters[i];
+    h += '<div class="tab' + (reminderFilter === f[0] ? ' active' : '') + '" onclick="setReminderFilter(\'' + f[0] + '\')">' + f[1] + '</div>';
+  }
+  h += '</div>';
+  h += '<button class="btn btn-primary btn-sm" onclick="openAddReminder()">+ 添加提醒</button></div>';
+  h += '<div id="reminderList"></div></div>';
+  return h;
+}
+
+function initReminders() { renderReminderList(); }
+
+function setReminderFilter(f) { reminderFilter = f; initReminders(); }
+
+function renderReminderList() {
+  var list = document.getElementById('reminderList');
+  if (!list) return;
+  var today = new Date().toISOString().slice(0, 10);
+  var reminders = DB.getReminders();
+
+  // Classify
+  var classified = [];
+  for (var i = 0; i < reminders.length; i++) {
+    var r = reminders[i];
+    var d = daysDiff(r.deadline, today);
+    var level = d < 0 ? 'urgent' : (d <= 7 ? 'urgent' : (d <= 30 ? 'warning' : 'normal'));
+    r._level = level;
+    r._days = d;
+    classified.push(r);
+  }
+
+  if (reminderFilter !== 'all') {
+    classified = classified.filter(function(r) { return r._level === reminderFilter; });
+  }
+
+  // Sort: urgent first
+  classified.sort(function(a, b) { return a._days - b._days; });
+
+  if (classified.length === 0) {
+    list.innerHTML = '<p style="color:var(--text-secondary);padding:30px;text-align:center;">暂无提醒</p>';
+    return;
+  }
+
+  var h = '';
+  for (var j = 0; j < classified.length; j++) {
+    var r = classified[j];
+    var levelClass = r._level;
+    var icon = r._level === 'urgent' ? '&#x26a0;' : (r._level === 'warning' ? '&#x23f0;' : '&#x2705;');
+    var daysText = r._days < 0 ? '已过期 ' + Math.abs(r._days) + ' 天' : '剩余 ' + r._days + ' 天';
+
+    h += '<div class="reminder-item ' + levelClass + '">';
+    h += '<span style="font-size:20px;">' + icon + '</span>';
+    h += '<div style="flex:1;">';
+    h += '<div style="font-weight:500;">' + esc(r.title || '') + '</div>';
+    h += '<div style="font-size:12px;color:var(--text-secondary);margin-top:2px;">' + esc(r.type || '') + ' | 截止: ' + fmtFull(r.deadline) + (r.advanceDays ? ' | 提前' + r.advanceDays + '天提醒' : '') + '</div>';
+    h += '</div>';
+    h += '<div style="text-align:right;min-width:80px;">';
+    h += '<div style="font-weight:600;font-size:14px;color:' + (r._days < 0 ? 'var(--accent)' : (r._days <= 7 ? 'var(--accent)' : 'var(--text)')) + ';">' + daysText + '</div>';
+    h += '</div>';
+    h += '<button class="btn btn-sm btn-outline" onclick="openEditReminder(\'' + r.id + '\')">编辑</button>';
+    h += '<button class="btn btn-sm btn-danger" onclick="confirmDeleteReminder(\'' + r.id + '\')">删除</button>';
+    h += '</div>';
+  }
+  list.innerHTML = h;
+}
+
+function openAddReminder() {
+  var body = '<div class="form-group"><label class="form-label">提醒标题</label><input class="form-input" id="rmTitle" placeholder="如：张三案上诉期限"></div>';
+  body += '<div class="form-group"><label class="form-label">类型</label><select class="form-select" id="rmType"><option>立案时效</option><option>上诉期限</option><option>保全期限</option><option>答辩期限</option><option>举证期限</option><option>其他</option></select></div>';
+  body += '<div class="form-group"><label class="form-label">关联案件</label><select class="form-select" id="rmCase">' + caseOptions() + '</select></div>';
+  body += '<div class="form-group"><label class="form-label">截止日期</label><input class="form-input" type="date" id="rmDeadline"></div>';
+  body += '<div class="form-group"><label class="form-label">提前提醒天数</label><input class="form-input" type="number" id="rmAdvance" value="7"></div>';
+  openModal('添加提醒', body, '<button class="btn btn-outline" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveNewReminder()">保存</button>');
+}
+
+function saveNewReminder() {
+  var title = document.getElementById('rmTitle').value.trim();
+  if (!title) { toast('请输入标题', 'error'); return; }
+  DB.addReminder({ title: title, type: document.getElementById('rmType').value, caseId: document.getElementById('rmCase').value, deadline: document.getElementById('rmDeadline').value, advanceDays: parseInt(document.getElementById('rmAdvance').value) || 7 });
+  closeModal(); toast('提醒已添加'); renderPage();
+}
+
+function openEditReminder(id) {
+  var r = DB.getReminders().find(function(x) { return x.id === id; });
+  if (!r) return;
+  var body = '<div class="form-group"><label class="form-label">提醒标题</label><input class="form-input" id="rmTitle" value="' + esc(r.title) + '"></div>';
+  body += '<div class="form-group"><label class="form-label">类型</label><select class="form-select" id="rmType">';
+  ['立案时效','上诉期限','保全期限','答辩期限','举证期限','其他'].forEach(function(t) { body += '<option' + (r.type === t ? ' selected' : '') + '>' + t + '</option>'; });
+  body += '</select></div>';
+  body += '<div class="form-group"><label class="form-label">关联案件</label><select class="form-select" id="rmCase">' + caseOptions(r.caseId) + '</select></div>';
+  body += '<div class="form-group"><label class="form-label">截止日期</label><input class="form-input" type="date" id="rmDeadline" value="' + (r.deadline || '') + '"></div>';
+  body += '<div class="form-group"><label class="form-label">提前提醒天数</label><input class="form-input" type="number" id="rmAdvance" value="' + (r.advanceDays || 7) + '"></div>';
+  openModal('编辑提醒', body, '<button class="btn btn-outline" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveEditReminder(\'' + id + '\')">保存</button>');
+}
+
+function saveEditReminder(id) {
+  var title = document.getElementById('rmTitle').value.trim();
+  if (!title) { toast('请输入标题', 'error'); return; }
+  DB.updateReminder(id, { title: title, type: document.getElementById('rmType').value, caseId: document.getElementById('rmCase').value, deadline: document.getElementById('rmDeadline').value, advanceDays: parseInt(document.getElementById('rmAdvance').value) || 7 });
+  closeModal(); toast('提醒已更新'); renderPage();
+}
+
+function confirmDeleteReminder(id) { if (confirm('确定删除？')) { DB.deleteReminder(id); toast('已删除'); renderPage(); } }
+
+// ============ SUMMARY ============
+var summaryType = 'weekly';
+var summaryOffset = 0;
+var summaryChart = null;
+
+function renderSummary() {
+  var h = '<div class="card">';
+  h += '<div class="card-header">';
+  h += '<div style="display:flex;gap:8px;">';
+  var types = [['weekly', '周报'], ['monthly', '月报'], ['yearly', '年报']];
+  for (var i = 0; i < types.length; i++) {
+    var t = types[i];
+    h += '<div class="tab' + (summaryType === t[0] ? ' active' : '') + '" onclick="setSummaryType(\'' + t[0] + '\')">' + t[1] + '</div>';
+  }
+  h += '</div>';
+  h += '<div style="display:flex;gap:8px;">';
+  h += '<button class="btn btn-sm btn-outline" onclick="setSummaryOffset(1)">上一期</button>';
+  h += '<span style="font-size:13px;line-height:32px;" id="summaryPeriodLabel">' + getSummaryPeriodLabel() + '</span>';
+  h += '<button class="btn btn-sm btn-outline" onclick="setSummaryOffset(-1)">下一期</button>';
+  h += '</div></div>';
+
+  h += '<div style="display:flex;gap:20px;flex-wrap:wrap;">';
+  // Left: stats + text
+  h += '<div style="flex:1;min-width:300px;" id="summaryStats"></div>';
+  // Right: chart
+  h += '<div style="flex:1;min-width:300px;"><canvas id="summaryChart" height="250"></canvas></div>';
+  h += '</div>';
+  h += '<div style="margin-top:20px;text-align:right;">';
+  h += '<button class="btn btn-primary" onclick="exportSummary()">导出报告</button>';
+  h += '</div>';
+  h += '</div>';
+  return h;
+}
+
+function getSummaryRange() {
+  var n = new Date();
+  if (summaryType === 'weekly') {
+    var d = new Date(n); d.setDate(d.getDate() - 7 * summaryOffset);
+    var start = new Date(d); start.setDate(d.getDate() - d.getDay()); start.setHours(0,0,0,0);
+    var end = new Date(start); end.setDate(start.getDate() + 7);
+    return { start: start.toISOString(), end: end.toISOString() };
+  } else if (summaryType === 'monthly') {
+    var m = new Date(n.getFullYear(), n.getMonth() - summaryOffset, 1);
+    return { start: m.toISOString(), end: new Date(m.getFullYear(), m.getMonth() + 1, 1).toISOString() };
+  } else {
+    var y = n.getFullYear() - summaryOffset;
+    return { start: new Date(y, 0, 1).toISOString(), end: new Date(y + 1, 0, 1).toISOString() };
+  }
+}
+
+function getSummaryPeriodLabel() {
+  var r = getSummaryRange();
+  var s = new Date(r.start), e = new Date(r.end);
+  return fmtFull(r.start) + ' ~ ' + fmtFull(new Date(e.getTime() - 86400000).toISOString());
+}
+
+function setSummaryType(t) { summaryType = t; summaryOffset = 0; renderPage(); }
+function setSummaryOffset(d) { summaryOffset += d; if (summaryOffset < 0) summaryOffset = 0; renderPage(); }
+
+function initSummary() {
+  var range = getSummaryRange();
+  var sStart = range.start, sEnd = range.end;
+  var scheds = DB.getSchedules().filter(function(s) { return s.date >= sStart && s.date < sEnd; });
+  var todos = DB.getTodos().filter(function(t) { return t.createdAt >= sStart && t.createdAt < sEnd; });
+  var todosDone = todos.filter(function(t) { return t.done; });
+  var cases = DB.getCases().filter(function(c) { return c.createdAt >= sStart && c.createdAt < sEnd; });
+  var casesClosed = DB.getCases().filter(function(c) { return c.status === '已结案' && c.createdAt >= sStart && c.createdAt < sEnd; });
+  var timers = DB.getTimers().filter(function(t) { return t.date >= sStart.slice(0,10) && t.date < sEnd.slice(0,10); });
+  var totalMin = 0;
+  for (var i = 0; i < timers.length; i++) { totalMin += (parseInt(timers[i].duration) || 0); }
+  var totalH = (totalMin / 60).toFixed(1);
+
+  var stats = document.getElementById('summaryStats');
+  if (stats) {
+    var sh = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px;">';
+    sh += '<div class="stat-card blue"><div class="stat-label">新增案件</div><div class="stat-number">' + cases.length + '</div></div>';
+    sh += '<div class="stat-card green"><div class="stat-label">结案案件</div><div class="stat-number">' + casesClosed.length + '</div></div>';
+    sh += '<div class="stat-card red"><div class="stat-label">日程安排</div><div class="stat-number">' + scheds.length + '</div></div>';
+    sh += '<div class="stat-card yellow"><div class="stat-label">完成待办</div><div class="stat-number">' + todosDone.length + '/' + todos.length + '</div></div>';
+    sh += '</div>';
+    if (totalMin > 0) {
+      sh += '<div style="font-size:14px;color:var(--text-secondary);">累计工作时间：<strong style="color:var(--primary);">' + totalH + ' 小时</strong></div>';
+    }
+    stats.innerHTML = sh;
+  }
+
+  renderSummaryChart(range);
+}
+
+function renderSummaryChart(range) {
+  var canvas = document.getElementById('summaryChart');
+  if (!canvas) return;
+  if (summaryChart) { summaryChart.destroy(); summaryChart = null; }
+
+  var sStart = range.start, sEnd = range.end;
+  var labels = [], schedCounts = [], todoCounts = [], caseCounts = [];
+
+  if (summaryType === 'weekly') {
+    var dayNames = ['周日','周一','周二','周三','周四','周五','周六'];
+    for (var i = 0; i < 7; i++) {
+      var d = new Date(sStart); d.setDate(d.getDate() + i);
+      var ds = d.toISOString().slice(0, 10);
+      labels.push(dayNames[i]);
+      schedCounts.push(DB.getSchedules().filter(function(s) { return s.date === ds; }).length);
+      todoCounts.push(DB.getTodos().filter(function(t) { return t.createdAt && t.createdAt.slice(0,10) === ds; }).length);
+    }
+  } else if (summaryType === 'monthly') {
+    for (var w = 0; w < 4; w++) {
+      labels.push('第' + (w+1) + '周');
+      var ws = new Date(sStart); ws.setDate(ws.getDate() + w * 7);
+      var we = new Date(ws); we.setDate(we.getDate() + 7);
+      var wss = ws.toISOString(), wse = we.toISOString();
+      schedCounts.push(DB.getSchedules().filter(function(s) { return s.date >= wss && s.date < wse; }).length);
+      todoCounts.push(DB.getTodos().filter(function(t) { return t.createdAt >= wss && t.createdAt < wse; }).length);
+    }
+  } else {
+    for (var m = 0; m < 12; m++) {
+      labels.push((m+1) + '月');
+      var ms = new Date(new Date(sStart).getFullYear(), m, 1).toISOString();
+      var me = new Date(new Date(sStart).getFullYear(), m + 1, 1).toISOString();
+      schedCounts.push(DB.getSchedules().filter(function(s) { return s.date >= ms && s.date < me; }).length);
+      caseCounts.push(DB.getCases().filter(function(c) { return c.createdAt >= ms && c.createdAt < me; }).length);
+    }
+  }
+
+  var datasets = [
+    { label: '日程', data: schedCounts, backgroundColor: 'rgba(43,108,176,0.7)', borderColor: '#2b6cb0', borderWidth: 1 },
+    { label: '待办', data: todoCounts, backgroundColor: 'rgba(229,62,62,0.7)', borderColor: '#e53e3e', borderWidth: 1 }
+  ];
+  if (summaryType === 'yearly') {
+    datasets.push({ label: '案件', data: caseCounts, backgroundColor: 'rgba(56,161,105,0.7)', borderColor: '#38a169', borderWidth: 1 });
+  }
+
+  summaryChart = new Chart(canvas, {
+    type: summaryType === 'yearly' ? 'line' : 'bar',
+    data: { labels: labels, datasets: datasets },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: 'bottom' } },
+      scales: { y: { beginAtZero: true, ticks: { stepSize: 1 } } }
+    }
+  });
+}
+
+function exportSummary() {
+  var stats = document.getElementById('summaryStats');
+  if (!stats) return;
+  var period = getSummaryPeriodLabel();
+  var typeNames = { weekly: '周报', monthly: '月报', yearly: '年报' };
+  var body = '<div style="padding:20px;font-family:serif;">';
+  body += '<h2 style="text-align:center;margin-bottom:8px;">工作' + typeNames[summaryType] + '</h2>';
+  body += '<p style="text-align:center;color:#666;margin-bottom:24px;">统计周期：' + period + '</p>';
+  body += '<div>' + stats.innerHTML + '</div>';
+  body += '<div style="margin-top:20px;font-size:14px;color:#666;">生成时间：' + new Date().toLocaleString('zh-CN') + '</div>';
+  body += '</div>';
+  var w = window.open('', '_blank');
+  if (w) { w.document.write('<html><head><title>工作' + typeNames[summaryType] + '</title></head><body>' + body + '</body></html>'); w.document.close(); w.print(); }
+  else { toast('请允许弹出窗口以导出', 'error'); }
+}
+
+// ============ TOOLS ============
+var currentTool = 'litigation';
+
+function renderTools() {
+  var h = '<div class="card">';
+  h += '<div class="card-header"><div style="display:flex;gap:8px;">';
+  var tools = [['litigation', '诉讼费计算器'], ['lawyerfee', '律师费计算器'], ['preservation', '保全费计算器'], ['timer', '计时器'], ['templates', '文书模板'], ['expenses', '费用记录'], ['contacts', '通讯录']];
+  for (var i = 0; i < tools.length; i++) {
+    var t = tools[i];
+    h += '<div class="tab' + (currentTool === t[0] ? ' active' : '') + '" onclick="switchTool(\'' + t[0] + '\')">' + t[1] + '</div>';
+  }
+  h += '</div></div>';
+  h += '<div id="toolContent"></div></div>';
+  return h;
+}
+
+function initTools() {
+  var tc = document.getElementById('toolContent');
+  if (!tc) return;
+  switch (currentTool) {
+    case 'litigation': tc.innerHTML = renderLitigationCalc(); break;
+    case 'lawyerfee': tc.innerHTML = renderLawyerFeeCalc(); break;
+    case 'preservation': tc.innerHTML = '<div style="padding:20px;">' + renderPreservationCalc() + '</div>'; break;
+    case 'timer': tc.innerHTML = renderTimer(); initTimer(); break;
+    case 'templates': tc.innerHTML = renderTemplates(); break;
+    case 'expenses': tc.innerHTML = renderExpenses(); initExpenses(); break;
+    case 'contacts': tc.innerHTML = renderContacts(); initContacts(); break;
+  }
+}
+
+function switchTool(t) { currentTool = t; initTools(); }
+
+// ============ LITIGATION FEE CALCULATOR ============
+function renderLitigationCalc() {
+  var h = '<h3 style="margin-bottom:16px;">诉讼费计算器</h3>';
+  h += '<p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">根据《诉讼费用交纳办法》计算案件受理费</p>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">';
+  h += '<div>';
+  h += '<div class="form-group"><label class="form-label">案件类型</label><select class="form-select" id="litType" onchange="onLitTypeChange()">';
+  h += '<option value="property">财产案件</option>';
+  h += '<option value="divorce">离婚案件</option>';
+  h += '<option value="labor">劳动争议</option>';
+  h += '<option value="ip">知识产权</option>';
+  h += '<option value="admin">行政案件</option>';
+  h += '</select></div>';
+  h += '<div class="form-group" id="litAmountGroup"><label class="form-label">诉讼标的额（元）</label><input class="form-input" type="number" id="litAmount" placeholder="请输入金额" oninput="calcLitigation()"></div>';
+  h += '<div class="form-group"><label class="form-label">适用程序</label><select class="form-select" id="litProcedure" onchange="calcLitigation()"><option value="normal">普通程序</option><option value="simple">简易程序（减半）</option></select></div>';
+  h += '<button class="btn btn-primary" onclick="calcLitigation()">计算诉讼费</button>';
+  h += '</div>';
+  h += '<div id="litResult" class="calc-result"><p style="color:var(--text-secondary);text-align:center;padding:20px;">输入金额后自动计算</p></div>';
+  h += '</div>';
+  return h;
+}
+
+function onLitTypeChange() {
+  var type = document.getElementById('litType').value;
+  var ag = document.getElementById('litAmountGroup');
+  if (type === 'property') { ag.style.display = 'block'; }
+  else if (type === 'ip') { ag.style.display = 'block'; }
+  else { ag.style.display = 'none'; }
+  calcLitigation();
+}
+
+function calcLitigation() {
+  var type = document.getElementById('litType').value;
+  var amount = parseFloat(document.getElementById('litAmount').value) || 0;
+  var procedure = document.getElementById('litProcedure').value;
+  var fee = 0;
+  var details = [];
+
+  if (type === 'property') {
+    var brackets = [
+      { max: 10000, rate: 0, fixed: 50, label: '1万元以下' },
+      { max: 100000, rate: 0.025, label: '1万~10万' },
+      { max: 200000, rate: 0.02, label: '10万~20万' },
+      { max: 500000, rate: 0.015, label: '20万~50万' },
+      { max: 1000000, rate: 0.01, label: '50万~100万' },
+      { max: 2000000, rate: 0.009, label: '100万~200万' },
+      { max: 5000000, rate: 0.008, label: '200万~500万' },
+      { max: 10000000, rate: 0.007, label: '500万~1000万' },
+      { max: 20000000, rate: 0.006, label: '1000万~2000万' },
+      { max: Infinity, rate: 0.005, label: '2000万以上' }
+    ];
+    var prev = 0;
+    for (var i = 0; i < brackets.length; i++) {
+      var b = brackets[i];
+      if (amount <= prev) break;
+      var taxable = Math.min(amount, b.max) - prev;
+      if (b.fixed) {
+        fee = b.fixed;
+        details.push({ label: b.label, amount: '-', fee: moneyFormat(fee) + ' 元' });
+      } else {
+        var part = taxable * b.rate;
+        fee += part;
+        if (taxable > 0) details.push({ label: b.label + ' (' + (b.rate * 100) + '%)', amount: moneyFormat(taxable) + ' 元', fee: moneyFormat(part) + ' 元' });
+      }
+      prev = b.max;
+    }
+  } else if (type === 'divorce') {
+    fee = 300;
+    if (amount > 200000) fee += (amount - 200000) * 0.005;
+    details.push({ label: '基础费用', amount: '-', fee: '300 元' });
+    if (amount > 200000) details.push({ label: '超过20万部分(0.5%)', amount: moneyFormat(amount - 200000) + ' 元', fee: moneyFormat((amount - 200000) * 0.005) + ' 元' });
+  } else if (type === 'labor') {
+    fee = 10;
+    details.push({ label: '劳动争议', amount: '-', fee: '10 元' });
+  } else if (type === 'ip') {
+    if (amount > 0) {
+      fee = 100;
+      var ipExtra = 0;
+      if (amount <= 10000) { ipExtra = 50; }
+      else if (amount <= 100000) { ipExtra = amount * 0.025 + 25; }
+      else { ipExtra = amount * 0.02 + 275; }
+      fee += ipExtra;
+      details.push({ label: '知识产权(有争议额)', amount: moneyFormat(amount) + ' 元', fee: moneyFormat(fee) + ' 元' });
+    } else {
+      fee = 0;
+      details.push({ label: '知识产权(无争议额)', amount: '-', fee: '不另行交纳' });
+    }
+  } else if (type === 'admin') {
+    fee = 100;
+    details.push({ label: '行政案件', amount: '-', fee: '100 元' });
+  }
+
+  if (procedure === 'simple' && fee > 0) {
+    fee = fee / 2;
+    details.push({ label: '简易程序减半', amount: '-', fee: '-50%' });
+  }
+
+  var h = '<h4 style="margin-bottom:12px;">计算结果</h4>';
+  h += '<div class="calc-row"><span>案件类型</span><span>' + document.getElementById('litType').selectedOptions[0].text + '</span></div>';
+  if (amount > 0) h += '<div class="calc-row"><span>诉讼标的额</span><span>' + moneyFormat(amount) + ' 元</span></div>';
+  for (var j = 0; j < details.length; j++) {
+    h += '<div class="calc-row"><span style="font-size:13px;">' + details[j].label + '</span><span style="font-size:13px;">' + details[j].fee + '</span></div>';
+  }
+  h += '<div class="calc-row"><span>应交纳诉讼费</span><span>' + moneyFormat(fee) + ' 元</span></div>';
+  document.getElementById('litResult').innerHTML = h;
+}
+
+// ============ LAWYER FEE CALCULATOR ============
+var lawyerFeeRates = [
+  { min: 0, max: 50000, low: 0, high: 0, base: true, baseFee: 5000, label: '基础收费' },
+  { min: 50000, max: 500000, low: 0.07, high: 0.09, label: '5万~50万' },
+  { min: 500000, max: 1000000, low: 0.06, high: 0.08, label: '50万~100万' },
+  { min: 1000000, max: 5000000, low: 0.05, high: 0.07, label: '100万~500万' },
+  { min: 5000000, max: 10000000, low: 0.04, high: 0.06, label: '500万~1000万' },
+  { min: 10000000, max: 50000000, low: 0.03, high: 0.05, label: '1000万~5000万' },
+  { min: 50000000, max: 100000000, low: 0.02, high: 0.04, label: '5000万~1亿' },
+  { min: 100000000, max: Infinity, low: 0.01, high: 0.02, label: '1亿以上' }
+];
+
+function renderLawyerFeeCalc() {
+  var h = '<h3 style="margin-bottom:16px;">律师费计算器</h3>';
+  h += '<p style="font-size:13px;color:var(--text-secondary);margin-bottom:16px;">根据分段累进计费规则计算代理费（滑动选择各段比例）</p>';
+  h += '<div class="form-group" style="max-width:400px;"><label class="form-label">争议金额（元）</label>';
+  h += '<input class="form-input" type="number" id="lfAmount" placeholder="请输入争议金额" oninput="calcLawyerFee()" value="1000000"></div>';
+  h += '<div id="lfSliders" style="margin:16px 0;"></div>';
+  h += '<div id="lfResult" class="calc-result"></div>';
+  return h;
+}
+
+function calcLawyerFee() {
+  var amount = parseFloat(document.getElementById('lfAmount').value) || 0;
+  var slidersDiv = document.getElementById('lfSliders');
+  var resultDiv = document.getElementById('lfResult');
+
+  // Build sliders
+  var sh = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 20px;font-size:13px;">';
+  sh += '<div style="font-weight:600;">金额区间</div><div style="font-weight:600;">收费比例</div>';
+  var totalFee = 5000;
+  var details = [];
+  details.push({ label: '基础收费', fee: 5000 });
+
+  for (var i = 1; i < lawyerFeeRates.length; i++) {
+    var b = lawyerFeeRates[i];
+    var taxable = 0;
+    if (amount > b.min) {
+      taxable = Math.min(amount, b.max) - b.min;
+    }
+    if (taxable <= 0 && amount <= b.min) continue;
+
+    var range = (b.high - b.low) * 100;
+    var step = range > 0 ? range / 100 : 0.1;
+    var defaultVal = ((b.low + b.high) / 2 * 100);
+    var sid = 'lfRate' + i;
+
+    sh += '<div>' + b.label;
+    if (taxable > 0) sh += '<br><span style="color:var(--text-secondary);font-size:12px;">计费基数: ' + moneyFormat(taxable) + ' 元</span>';
+    else sh += '<br><span style="color:var(--text-secondary);font-size:12px;">不计费</span>';
+    sh += '</div>';
+    sh += '<div style="display:flex;align-items:center;gap:6px;">';
+    sh += '<span>' + (b.low * 100).toFixed(0) + '%</span>';
+    sh += '<input type="range" min="' + (b.low * 100).toFixed(0) + '" max="' + (b.high * 100).toFixed(0) + '" step="' + (b.high * 100 - b.low * 100 >= 2 ? 0.5 : 0.1) + '" value="' + defaultVal.toFixed(1) + '" id="' + sid + '" oninput="calcLawyerFee()" style="flex:1;"' + (taxable <= 0 ? ' disabled' : '') + '>';
+    sh += '<span id="' + sid + 'Label">' + defaultVal.toFixed(1) + '%</span>';
+    sh += '</div>';
+  }
+  sh += '</div>';
+  slidersDiv.innerHTML = sh;
+
+  // Calculate
+  for (var j = 1; j < lawyerFeeRates.length; j++) {
+    var bj = lawyerFeeRates[j];
+    var taxableJ = 0;
+    if (amount > bj.min) { taxableJ = Math.min(amount, bj.max) - bj.min; }
+    if (taxableJ <= 0) continue;
+    var slider = document.getElementById('lfRate' + j);
+    var label = document.getElementById('lfRate' + j + 'Label');
+    if (slider && label) {
+      var rate = parseFloat(slider.value) / 100;
+      label.textContent = slider.value + '%';
+      var partFee = taxableJ * rate;
+      totalFee += partFee;
+      details.push({ label: bj.label + ' (' + slider.value + '%)', amount: moneyFormat(taxableJ), fee: partFee });
+    }
+  }
+
+  // Result
+  var rh = '<h4 style="margin-bottom:12px;">计算结果</h4>';
+  rh += '<div class="calc-row"><span>争议金额</span><span>' + moneyFormat(amount) + ' 元</span></div>';
+  for (var k = 0; k < details.length; k++) {
+    var d = details[k];
+    if (d.amount) {
+      rh += '<div class="calc-row"><span style="font-size:13px;">' + d.label + ' (基数 ' + d.amount + ')</span><span style="font-size:13px;">' + moneyFormat(d.fee) + ' 元</span></div>';
+    } else {
+      rh += '<div class="calc-row"><span style="font-size:13px;">' + d.label + '</span><span style="font-size:13px;">' + moneyFormat(d.fee) + ' 元</span></div>';
+    }
+  }
+  rh += '<div class="calc-row"><span>律师费合计</span><span>' + moneyFormat(totalFee) + ' 元</span></div>';
+  resultDiv.innerHTML = rh;
+}
+
+// ============ TIMER ============
+var timerInterval = null;
+var timerSeconds = 0;
+var timerRunning = false;
+
+function renderTimer() {
+  var h = '<h3 style="margin-bottom:16px;">计时器</h3>';
+  h += '<div style="max-width:400px;margin:0 auto;text-align:center;">';
+  h += '<div class="form-group" style="text-align:left;"><label class="form-label">关联案件</label><select class="form-select" id="timerCase">' + caseOptions() + '</select></div>';
+  h += '<div class="timer-display" id="timerDisplay" style="margin:30px 0;">00:00:00</div>';
+  h += '<div style="display:flex;justify-content:center;gap:12px;margin-bottom:30px;">';
+  h += '<button class="timer-btn" style="background:var(--success);color:#fff;" id="timerStartBtn" onclick="toggleTimer()">▶</button>';
+  h += '<button class="timer-btn" style="background:var(--accent);color:#fff;" onclick="stopTimer()">■</button>';
+  h += '</div>';
+  h += '<h4 style="text-align:left;margin-bottom:12px;">计时记录</h4>';
+  h += '<div class="card" style="padding:0;overflow:hidden;" id="timerRecords"></div>';
+  h += '</div>';
+  return h;
+}
+
+function initTimer() { renderTimerRecords(); }
+
+function toggleTimer() {
+  if (timerRunning) {
+    clearInterval(timerInterval);
+    timerRunning = false;
+    document.getElementById('timerStartBtn').innerHTML = '▶';
+    document.getElementById('timerStartBtn').style.background = 'var(--success)';
+  } else {
+    timerRunning = true;
+    document.getElementById('timerStartBtn').innerHTML = '❚❚';
+    document.getElementById('timerStartBtn').style.background = 'var(--warning)';
+    timerInterval = setInterval(function() {
+      timerSeconds++;
+      var h = Math.floor(timerSeconds / 3600);
+      var m = Math.floor((timerSeconds % 3600) / 60);
+      var s = timerSeconds % 60;
+      document.getElementById('timerDisplay').textContent = String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
+    }, 1000);
+  }
+}
+
+function stopTimer() {
+  clearInterval(timerInterval);
+  timerRunning = false;
+  if (timerSeconds > 0) {
+    var caseId = document.getElementById('timerCase').value;
+    var cases = DB.getCases();
+    var caseName = '';
+    for (var i = 0; i < cases.length; i++) { if (cases[i].id === caseId) { caseName = cases[i].name; break; } }
+    DB.addTimer({ caseId: caseId, caseName: caseName, date: new Date().toISOString().slice(0, 10), duration: timerSeconds, note: '' });
+    toast('计时记录已保存 (' + formatDuration(timerSeconds) + ')');
+    timerSeconds = 0;
+    document.getElementById('timerDisplay').textContent = '00:00:00';
+    document.getElementById('timerStartBtn').innerHTML = '▶';
+    document.getElementById('timerStartBtn').style.background = 'var(--success)';
+    renderTimerRecords();
+  }
+}
+
+function formatDuration(sec) {
+  var h = Math.floor(sec / 3600);
+  var m = Math.floor((sec % 3600) / 60);
+  var s = sec % 60;
+  if (h > 0) return h + '小时' + m + '分' + s + '秒';
+  if (m > 0) return m + '分' + s + '秒';
+  return s + '秒';
+}
+
+function renderTimerRecords() {
+  var div = document.getElementById('timerRecords');
+  if (!div) return;
+  var records = DB.getTimers().slice().reverse();
+  if (records.length === 0) { div.innerHTML = '<p style="color:var(--text-secondary);padding:20px;text-align:center;">暂无记录</p>'; return; }
+  var h = '';
+  for (var i = 0; i < records.length; i++) {
+    var r = records[i];
+    h += '<div class="timer-record">';
+    h += '<div><div style="font-weight:500;">' + esc(r.caseName || '未关联案件') + '</div>';
+    h += '<div style="font-size:12px;color:var(--text-secondary);">' + fmtFull(r.date) + '</div></div>';
+    h += '<div style="display:flex;align-items:center;gap:12px;">';
+    h += '<span style="font-weight:600;color:var(--primary);">' + formatDuration(r.duration) + '</span>';
+    h += '<button class="btn btn-sm btn-danger" onclick="DB.deleteTimer(\'' + r.id + '\');toast(\'已删除\');initTools();">删除</button>';
+    h += '</div></div>';
+  }
+  div.innerHTML = h;
+}
+
+// ============ DOCUMENT TEMPLATES ============
+var docTemplates = [
+  { name: '民事起诉状', desc: '民事一审通用起诉状模板', content: '民事起诉状\n\n原告：[原告姓名]，[性别]，[出生年月日]，[民族]，[职业]，住[住址]，联系电话：[电话]\n\n被告：[被告姓名]，[性别]，[出生年月日]，[民族]，[职业]，住[住址]，联系电话：[电话]\n\n诉讼请求：\n一、[诉讼请求1]；\n二、[诉讼请求2]；\n三、本案诉讼费用由被告承担。\n\n事实与理由：\n[陈述事实经过和理由，说明被告的违约或侵权行为，以及由此造成的损失]\n\n综上所述，原告认为[总结理由]。为维护原告的合法权益，特依照《中华人民共和国民事诉讼法》第[条]条之规定，向贵院提起诉讼，恳请依法裁判。\n\n此致\n[管辖法院名称]人民法院\n\n具状人：[原告姓名]\n[日期]' },
+  { name: '民事答辩状', desc: '民事一审通用答辩状模板', content: '民事答辩状\n\n答辩人：[姓名]，[性别]，[出生年月日]，住[住址]，联系电话：[电话]\n\n被答辩人（原告）：[原告姓名]，[性别]，住[住址]\n\n答辩人就[原告姓名]诉答辩人[案由]一案，提出如下答辩意见：\n\n一、[答辩意见1]\n[事实依据和理由]\n\n二、[答辩意见2]\n[事实依据和理由]\n\n三、[答辩意见3]\n[事实依据和理由]\n\n综上所述，答辩人认为[总结]。被答辩人的诉讼请求缺乏事实和法律依据，恳请人民法院依法驳回其诉讼请求。\n\n此致\n[法院名称]人民法院\n\n答辩人：[姓名]\n[日期]' },
+  { name: '代理词', desc: '诉讼代理意见书模板', content: '代理词\n\n尊敬的审判长、审判员：\n\n[律师事务所名称]接受[委托人]的委托，指派我担任其诉[对方当事人][案由]一案的[诉讼地位]代理人。经过庭前准备和参加今日庭审，现发表如下代理意见：\n\n一、关于[争议焦点1]\n[论述事实、证据和法律依据]\n\n二、关于[争议焦点2]\n[论述事实、证据和法律依据]\n\n三、关于[争议焦点3]\n[论述事实、证据和法律依据]\n\n综合以上代理意见，代理人认为[总结观点和请求]，恳请合议庭予以采信。\n\n此致\n[法院名称]人民法院\n\n代理人：[律师姓名]\n[律师事务所名称]\n[日期]' },
+  { name: '法律意见书', desc: '专项法律意见书模板', content: '法律意见书\n\n致：[委托人名称]\n\n关于：[事项名称]之法律意见\n\n[律师事务所名称]（以下简称"本所"）接受[委托人]（以下简称"委托人"）的委托，就[事项]事宜，根据委托人提供的资料及本所律师的调查研究，出具本法律意见。\n\n一、事实概况\n[描述相关事实情况]\n\n二、法律分析\n[适用的法律法规及分析]\n\n三、法律意见\n1. [意见1]\n2. [意见2]\n3. [意见3]\n\n四、风险提示\n[相关法律风险及建议]\n\n五、结论\n[综合结论和建议]\n\n本法律意见仅供委托人参考，不得用于其他目的。\n\n[律师事务所名称]\n经办律师：[律师姓名]\n[日期]' },
+  { name: '财产保全申请书', desc: '诉讼财产保全申请书', content: '财产保全申请书\n\n申请人：[姓名]，[性别]，住[住址]，联系电话：[电话]\n被申请人：[姓名]，[性别]，住[住址]\n\n请求事项：\n请求贵院依法查封、扣押、冻结被申请人名下价值[金额]元的财产。\n\n事实与理由：\n申请人与被申请人因[案由]纠纷一案，贵院已依法受理（案号：[案号]）。为防止被申请人转移、隐匿财产，导致将来判决难以执行，特依据《中华人民共和国民事诉讼法》第一百零三条之规定，申请贵院采取财产保全措施。\n\n担保方式：\n[提供担保的方式，如：申请人自愿提供[金额]元现金担保 / [担保人姓名]自愿提供担保]\n\n保全财产线索：\n1. [具体财产线索1]\n2. [具体财产线索2]\n\n此致\n[法院名称]人民法院\n\n申请人：[姓名]\n[日期]' },
+  { name: '证据清单', desc: '诉讼证据清单模板', content: '证据清单\n\n案号：[案号]\n案由：[案由]\n提交人：[姓名/单位]\n\n序号 | 证据名称 | 证据形式 | 证明目的 | 页数 | 原件/复印件\n---|---|---|---|---|---\n1 | [证据名称1] | [书证/物证/电子数据等] | [证明目的] | [页数] | [原件/复印件]\n2 | [证据名称2] | [书证/物证/电子数据等] | [证明目的] | [页数] | [原件/复印件]\n3 | [证据名称3] | [书证/物证/电子数据等] | [证明目的] | [页数] | [原件/复印件]\n\n说明：\n以上证据均已准备完毕，随本清单一并提交。\n\n提交人：[姓名]\n日期：[日期]' }
+];
+
+function renderTemplates() {
+  var h = '<h3 style="margin-bottom:16px;">文书模板</h3>';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;">';
+  for (var i = 0; i < docTemplates.length; i++) {
+    var t = docTemplates[i];
+    h += '<div class="template-card" onclick="viewTemplate(' + i + ')">';
+    h += '<div style="font-weight:600;margin-bottom:4px;">' + esc(t.name) + '</div>';
+    h += '<div style="font-size:12px;color:var(--text-secondary);">' + esc(t.desc) + '</div>';
+    h += '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function viewTemplate(idx) {
+  var t = docTemplates[idx];
+  var body = '<pre style="white-space:pre-wrap;font-size:13px;line-height:1.8;background:var(--bg);padding:16px;border-radius:8px;max-height:60vh;overflow-y:auto;">' + esc(t.content) + '</pre>';
+  var footer = '<button class="btn btn-outline" onclick="copyTemplate(' + idx + ')">复制内容</button>';
+  footer += '<button class="btn btn-primary" onclick="closeModal()">关闭</button>';
+  openModal(t.name, body, footer);
+}
+
+function copyTemplate(idx) {
+  var text = docTemplates[idx].content;
+  navigator.clipboard.writeText(text).then(function() { toast('已复制到剪贴板'); }).catch(function() { toast('复制失败，请手动复制', 'error'); });
+}
+
+// ============ EXPENSES ============
+function renderExpenses() {
+  var h = '<h3 style="margin-bottom:16px;">费用记录</h3>';
+  h += '<div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">';
+  h += '<div class="form-group" style="margin-bottom:0;"><label class="form-label">日期</label><input class="form-input" type="date" id="expDate" value="' + new Date().toISOString().slice(0, 10) + '"></div>';
+  h += '<div class="form-group" style="margin-bottom:0;"><label class="form-label">关联案件</label><select class="form-select" id="expCase">' + caseOptions() + '</select></div>';
+  h += '<div class="form-group" style="margin-bottom:0;"><label class="form-label">费用类型</label><select class="form-select" id="expType"><option>诉讼费</option><option>律师费</option><option>差旅费</option><option>鉴定费</option><option>保全费</option><option>执行费</option><option>其他</option></select></div>';
+  h += '<div class="form-group" style="margin-bottom:0;"><label class="form-label">金额（元）</label><input class="form-input" type="number" id="expAmount" placeholder="0.00"></div>';
+  h += '<div class="form-group" style="margin-bottom:0;"><label class="form-label">备注</label><input class="form-input" id="expNote" placeholder="备注"></div>';
+  h += '<div style="display:flex;align-items:flex-end;"><button class="btn btn-primary" onclick="addExpenseRecord()">添加</button></div>';
+  h += '</div>';
+  h += '<div id="expenseList"></div>';
+  return h;
+}
+
+function initExpenses() { renderExpenseList(); }
+
+function addExpenseRecord() {
+  var amount = parseFloat(document.getElementById('expAmount').value);
+  if (!amount || amount <= 0) { toast('请输入有效金额', 'error'); return; }
+  DB.addExpense({
+    date: document.getElementById('expDate').value,
+    caseId: document.getElementById('expCase').value,
+    type: document.getElementById('expType').value,
+    amount: amount,
+    note: document.getElementById('expNote').value.trim()
+  });
+  document.getElementById('expAmount').value = '';
+  document.getElementById('expNote').value = '';
+  toast('费用已添加');
+  renderExpenseList();
+}
+
+function renderExpenseList() {
+  var div = document.getElementById('expenseList');
+  if (!div) return;
+  var expenses = DB.getExpenses().slice().reverse();
+  if (expenses.length === 0) { div.innerHTML = '<p style="color:var(--text-secondary);padding:20px;text-align:center;">暂无费用记录</p>'; return; }
+  var total = 0;
+  var h = '<div class="table-wrap"><table class="table"><thead><tr><th>日期</th><th>案件</th><th>类型</th><th>金额</th><th>备注</th><th>操作</th></tr></thead><tbody>';
+  for (var i = 0; i < expenses.length; i++) {
+    var e = expenses[i];
+    total += (parseFloat(e.amount) || 0);
+    var caseName = '';
+    if (e.caseId) { var c = DB.getCases().find(function(x) { return x.id === e.caseId; }); if (c) caseName = esc(c.name); }
+    h += '<tr><td>' + fmtFull(e.date) + '</td><td>' + (caseName || '-') + '</td><td><span class="tag tag-blue">' + esc(e.type) + '</span></td>';
+    h += '<td style="font-weight:600;color:var(--accent);">' + moneyFormat(e.amount) + '</td>';
+    h += '<td>' + esc(e.note || '-') + '</td>';
+    h += '<td><button class="btn btn-sm btn-danger" onclick="DB.deleteExpense(\'' + e.id + '\');toast(\'已删除\');initTools();">删除</button></td></tr>';
+  }
+  h += '</tbody></table></div>';
+  h += '<div style="text-align:right;margin-top:12px;font-size:15px;font-weight:600;">合计：<span style="color:var(--accent);">' + moneyFormat(total) + ' 元</span></div>';
+  div.innerHTML = h;
+}
+
+// ============ CONTACTS ============
+var contactSearch = '';
+
+function renderContacts() {
+  var h = '<h3 style="margin-bottom:16px;">通讯录</h3>';
+  h += '<div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;">';
+  h += '<div class="form-group" style="margin-bottom:0;flex:1;min-width:200px;"><input class="form-input" placeholder="搜索姓名/单位..." id="contactSearchInput" oninput="contactSearch=this.value;renderContactList();"></div>';
+  h += '<div style="display:flex;align-items:flex-end;"><button class="btn btn-primary" onclick="openAddContact()">+ 添加联系人</button></div>';
+  h += '</div>';
+  h += '<div id="contactList"></div>';
+  return h;
+}
+
+function initContacts() { renderContactList(); }
+
+function renderContactList() {
+  var div = document.getElementById('contactList');
+  if (!div) return;
+  var contacts = DB.getContacts();
+  if (contactSearch) {
+    var kw = contactSearch.toLowerCase();
+    contacts = contacts.filter(function(c) { return (c.name || '').toLowerCase().indexOf(kw) >= 0 || (c.company || '').toLowerCase().indexOf(kw) >= 0; });
+  }
+  if (contacts.length === 0) { div.innerHTML = '<p style="color:var(--text-secondary);padding:20px;text-align:center;">暂无联系人</p>'; return; }
+  var typeColors = { '当事人': 'tag-blue', '法官': 'tag-red', '检察官': 'tag-purple', '同行': 'tag-green', '其他': 'tag-gray' };
+  var h = '<div class="table-wrap"><table class="table"><thead><tr><th>姓名</th><th>职务</th><th>单位</th><th>电话</th><th>类型</th><th>操作</th></tr></thead><tbody>';
+  for (var i = 0; i < contacts.length; i++) {
+    var c = contacts[i];
+    h += '<tr><td style="font-weight:500;cursor:pointer;" onclick="viewContact(\'' + c.id + '\')">' + esc(c.name) + '</td>';
+    h += '<td>' + esc(c.position || '-') + '</td><td>' + esc(c.company || '-') + '</td>';
+    h += '<td>' + esc(c.phone || c.mobile || '-') + '</td>';
+    h += '<td><span class="tag ' + (typeColors[c.type] || 'tag-gray') + '">' + esc(c.type || '其他') + '</span></td>';
+    h += '<td><button class="btn btn-sm btn-outline" onclick="openEditContact(\'' + c.id + '\')">编辑</button> ';
+    h += '<button class="btn btn-sm btn-danger" onclick="confirmDeleteContact(\'' + c.id + '\')">删除</button></td></tr>';
+  }
+  h += '</tbody></table></div>';
+  div.innerHTML = h;
+}
+
+function viewContact(id) { openEditContact(id); }
+
+function openAddContact() {
+  var body = buildContactForm();
+  openModal('添加联系人', body, '<button class="btn btn-outline" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveNewContact()">保存</button>');
+}
+
+function openEditContact(id) {
+  var c = DB.getContacts().find(function(x) { return x.id === id; });
+  if (!c) return;
+  var body = buildContactForm(c);
+  openModal('编辑联系人', body, '<button class="btn btn-outline" onclick="closeModal()">取消</button><button class="btn btn-primary" onclick="saveEditContact(\'' + id + '\')">保存</button>');
+}
+
+function buildContactForm(c) {
+  c = c || {};
+  var h = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">';
+  h += '<div class="form-group"><label class="form-label">姓名</label><input class="form-input" id="ctName" value="' + esc(c.name || '') + '"></div>';
+  h += '<div class="form-group"><label class="form-label">类型</label><select class="form-select" id="ctType">';
+  ['当事人','法官','检察官','同行','其他'].forEach(function(t) { h += '<option' + (c.type === t ? ' selected' : '') + '>' + t + '</option>'; });
+  h += '</select></div></div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">';
+  h += '<div class="form-group"><label class="form-label">职务</label><input class="form-input" id="ctPosition" value="' + esc(c.position || '') + '"></div>';
+  h += '<div class="form-group"><label class="form-label">单位</label><input class="form-input" id="ctCompany" value="' + esc(c.company || '') + '"></div></div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">';
+  h += '<div class="form-group"><label class="form-label">电话</label><input class="form-input" id="ctPhone" value="' + esc(c.phone || '') + '"></div>';
+  h += '<div class="form-group"><label class="form-label">手机</label><input class="form-input" id="ctMobile" value="' + esc(c.mobile || '') + '"></div></div>';
+  h += '<div class="form-group"><label class="form-label">邮箱</label><input class="form-input" id="ctEmail" value="' + esc(c.email || '') + '"></div>';
+  return h;
+}
+
+function saveNewContact() {
+  var name = document.getElementById('ctName').value.trim();
+  if (!name) { toast('请输入姓名', 'error'); return; }
+  DB.addContact({ name: name, type: document.getElementById('ctType').value, position: document.getElementById('ctPosition').value.trim(), company: document.getElementById('ctCompany').value.trim(), phone: document.getElementById('ctPhone').value.trim(), mobile: document.getElementById('ctMobile').value.trim(), email: document.getElementById('ctEmail').value.trim() });
+  closeModal(); toast('联系人已添加'); initTools();
+}
+
+function saveEditContact(id) {
+  var name = document.getElementById('ctName').value.trim();
+  if (!name) { toast('请输入姓名', 'error'); return; }
+  DB.updateContact(id, { name: name, type: document.getElementById('ctType').value, position: document.getElementById('ctPosition').value.trim(), company: document.getElementById('ctCompany').value.trim(), phone: document.getElementById('ctPhone').value.trim(), mobile: document.getElementById('ctMobile').value.trim(), email: document.getElementById('ctEmail').value.trim() });
+  closeModal(); toast('联系人已更新'); initTools();
+}
+
+function confirmDeleteContact(id) { if (confirm('确定删除？')) { DB.deleteContact(id); toast('已删除'); initTools(); } }
+
+// ============ PRESERVATION FEE CALCULATOR ============
+function calcPreservationFee(amount) {
+  // 《诉讼费用交纳办法》第29条：财产保全费
+  // 不超过1000元的，每件30元
+  // 超过1000元至10万元，按1%收取
+  // 超过10万元，按0.5%收取，每件最高5000元
+  var fee = 0;
+  var breakdown = [];
+  if (amount <= 0) return { fee: 0, breakdown: [] };
+
+  if (amount <= 1000) {
+    fee = 30;
+    breakdown.push({ label: '不超过1000元（每件定额）', amount: 1000, rate: '定额30元', fee: 30 });
+  } else if (amount <= 100000) {
+    fee = 30 + (amount - 1000) * 0.01;
+    breakdown.push({ label: '不超过1000元部分', amount: 1000, rate: '定额30元', fee: 30 });
+    breakdown.push({ label: '1000元至10万元部分', amount: amount - 1000, rate: '1%', fee: (amount - 1000) * 0.01 });
+  } else {
+    var part2 = (100000 - 1000) * 0.01;
+    var part3 = (amount - 100000) * 0.005;
+    var rawFee = 30 + part2 + part3;
+    fee = Math.min(rawFee, 5000);
+    breakdown.push({ label: '不超过1000元部分', amount: 1000, rate: '定额30元', fee: 30 });
+    breakdown.push({ label: '1000元至10万元部分', amount: 99000, rate: '1%', fee: part2 });
+    breakdown.push({ label: '超过10万元部分', amount: amount - 100000, rate: '0.5%', fee: (amount - 100000) * 0.005 });
+    if (rawFee > 5000) {
+      breakdown.push({ label: '已达上限（每件最高5000元）', amount: 0, rate: '—', fee: 0 });
+    }
+  }
+  return { fee: Math.min(fee, 5000), breakdown: breakdown };
+}
+
+function renderPreservationCalc() {
+  return '<div class="card" style="max-width:560px;">' +
+    '<div class="card-header"><div class="card-title">💰 财产保全费计算器</div></div>' +
+    '<div class="form-group">' +
+      '<label class="form-label">申请保全金额（元）</label>' +
+      '<input class="form-input" type="number" id="presAmount" placeholder="请输入保全金额" min="0" oninput="onPresCalc()" />' +
+    '</div>' +
+    '<div id="presResult"></div>' +
+  '</div>';
+}
+
+function onPresCalc() {
+  var val = parseFloat(document.getElementById('presAmount').value);
+  var result = document.getElementById('presResult');
+  if (!val || val <= 0) { result.innerHTML = ''; return; }
+  var r = calcPreservationFee(val);
+  var html = '<div class="pres-result">';
+  html += '<div style="font-size:13px;font-weight:600;color:var(--text-secondary);margin-bottom:10px;">费用明细</div>';
+  r.breakdown.forEach(function(b) {
+    if (b.amount > 0 || b.fee > 0) {
+      html += '<div class="pres-row"><span>' + b.label + '</span><span>' + moneyFmt(b.fee) + ' 元</span></div>';
+    } else if (b.label.indexOf('上限') >= 0) {
+      html += '<div class="pres-row" style="color:var(--accent)"><span>' + b.label + '</span><span>—</span></div>';
+    }
+  });
+  html += '<div class="pres-row" style="margin-top:6px;"><span>合计保全费</span><span style="color:var(--accent);font-size:18px;">¥ ' + moneyFmt(r.fee) + ' 元</span></div>';
+  html += '</div>';
+  html += '<div style="font-size:12px;color:var(--text-secondary);margin-top:10px;padding:10px;background:#f7fafc;border-radius:6px;">依据：《诉讼费用交纳办法》第29条。保全费按申请保全数额分段计算，每件上限5000元。</div>';
+  result.innerHTML = html;
+}
+
+function moneyFmt(n) {
+  return Number(n.toFixed(2)).toLocaleString('zh-CN');
+}
+
+// ============ YAOSUSHI (要素式诉状生成器) ============
+var YS_TYPES = [
+  { id: 'minjie', name: '民间借贷纠纷', icon: '💵', type: '起诉状' },
+  { id: 'maimai', name: '买卖合同纠纷', icon: '🛒', type: '起诉状' },
+  { id: 'fangmaijie', name: '房屋买卖合同纠纷', icon: '🏠', type: '起诉状' },
+  { id: 'fangzu', name: '房屋租赁合同纠纷', icon: '🏢', type: '起诉状' },
+  { id: 'jinjie', name: '金融借款合同纠纷', icon: '🏦', type: '起诉状' },
+  { id: 'laodong', name: '劳动争议纠纷', icon: '👷', type: '起诉状' },
+  { id: 'lihun', name: '离婚纠纷', icon: '💔', type: '起诉状' },
+  { id: 'jianshe', name: '建设工程施工合同纠纷', icon: '🏗️', type: '起诉状' },
+  { id: 'jidong', name: '机动车交通事故责任纠纷', icon: '🚗', type: '起诉状' },
+  { id: 'buzh', name: '不正当竞争纠纷', icon: '⚖️', type: '起诉状' },
+  { id: 'caisun', name: '财产损失保险合同纠纷', icon: '🛡️', type: '起诉状' },
+  { id: 'baozheng', name: '保证保险合同纠纷', icon: '📋', type: '答辩状' },
+  { id: 'zhixing', name: '强制执行申请书', icon: '⚡', type: '申请书' },
+  { id: 'yijian', name: '执行异议申请书', icon: '📝', type: '申请书' },
+  { id: 'fuyi', name: '执行复议申请书', icon: '🔄', type: '申请书' },
+  { id: 'canyufenpei', name: '参与分配申请书', icon: '💼', type: '申请书' },
+];
+
+var ysState = { selectedType: null, step: 1, parseTab: 'text', parseResult: null };
+
+function renderYaosushi() {
+  var html = '<div class="yaosushi-container">';
+
+  // ===== 智能解析对话框 =====
+  html += '<div class="ys-parse-dialog" id="ysParseDialog">';
+  html += '<div class="ys-parse-dialog-title">🤖 智能解析传统诉状<span class="ys-parse-badge identified">NEW</span></div>';
+  html += '<div class="ys-parse-dialog-desc">粘贴或上传传统格式起诉状，自动识别当事人、案由、诉讼请求、借款金额、日期等关键要素，一键填充到下方表单——就像快递小程序识别收件人一样。</div>';
+  html += '<div class="ys-parse-tabs">';
+  html += '<div class="ys-parse-tab' + (ysState.parseTab !== 'upload' ? ' active' : '') + '" onclick="ysSetParseTab(\'text\')">📝 粘贴文字</div>';
+  html += '<div class="ys-parse-tab' + (ysState.parseTab === 'upload' ? ' active' : '') + '" onclick="ysSetParseTab(\'upload\')">📎 上传文件</div>';
+  html += '</div>';
+  if (ysState.parseTab === 'upload') {
+    html += '<div class="ys-parse-upload-area" onclick="document.getElementById(\'ysFileInput\').click()">';
+    html += '<div class="ys-parse-upload-icon">📄</div>';
+    html += '<div class="ys-parse-upload-text">点击选择或拖拽文件到此处</div>';
+    html += '<div class="ys-parse-upload-hint">支持 .txt 文件（.docx 需先导出为纯文本）</div>';
+    html += '</div>';
+    html += '<input type="file" id="ysFileInput" accept=".txt,.text" style="display:none" onchange="ysHandleFileUpload(this)">';
+  } else {
+    html += '<textarea class="ys-parse-textarea" id="ysParseInput" placeholder="请将传统格式的起诉状原文粘贴至此处...\n\n例如：\n民事起诉状\n原告：张三，男，汉族，1980年1月1日出生，现住...\n被告：李四，男，汉族，现住...\n诉讼请求：\n一、判令被告偿还借款本金100000元...\n事实与理由：\n2022年3月1日，被告向原告借款..."></textarea>';
+  }
+  html += '<div class="ys-parse-actions">';
+  html += '<button class="btn btn-primary" onclick="ysStartParse()" style="background:var(--primary);color:#fff;padding:9px 24px;font-size:14px;">🔍 立即识别</button>';
+  html += '<button class="btn btn-outline" onclick="ysParseInput && (document.getElementById(\'ysParseInput\') ? document.getElementById(\'ysParseInput\').value=\'\' : 0); ysState.parseResult=null; renderYaosushi();" style="font-size:13px;">清空</button>';
+  html += '<span style="font-size:12px;color:var(--text-secondary);margin-left:auto;">识别后自动跳转对应类型表单并填入数据</span>';
+  html += '</div>';
+  // 识别结果展示
+  if (ysState.parseResult) {
+    var pr = ysState.parseResult;
+    html += '<div class="ys-parse-result">';
+    html += '<div class="ys-parse-result-title">✅ 识别结果 <span class="ys-parse-badge identified">已识别 ' + pr._identified + ' 项</span>';
+    if (pr._typeLabel) html += '<span class="ys-parse-badge partial" style="margin-left:4px;">案由：' + pr._typeLabel + '</span>';
+    html += '</div>';
+    var showFields = [
+      ['案由类型', pr._typeLabel], ['原告姓名', pr.p_name], ['原告地址', pr.p_addr], ['原告电话', pr.p_phone],
+      ['被告姓名', pr.d_name], ['被告地址', pr.d_addr], ['被告电话', pr.d_phone],
+      ['借款金额', pr.amount ? pr.amount + ' 元' : null], ['借款期限', pr.period],
+      ['约定利率', pr.rate ? pr.rate + '%/年' : null], ['出借方式', pr.payway],
+      ['诉讼请求', pr.claims]
+    ];
+    showFields.forEach(function(f) {
+      if (f[1]) {
+        html += '<div class="ys-parse-item"><span class="ys-parse-item-label">' + f[0] + '</span>';
+        html += '<span class="ys-parse-item-value' + (f[0]==='案由类型'||f[0]==='借款金额' ? ' highlight' : '') + '">' + esc(f[1]) + '</span></div>';
+      }
+    });
+    html += '<button class="ys-parse-fill-btn" onclick="ysFillFormFromParse()">⚡ 一键填入表单</button>';
+    html += '</div>';
+  }
+  html += '</div>';
+
+  // ===== 文书类型选择 =====
+  html += '<div class="card" style="margin-bottom:20px;">';
+  html += '<div class="card-header"><div class="card-title">📄 要素式诉状生成器</div>';
+  html += '<div style="font-size:13px;color:var(--text-secondary);">支持16种官方要素式诉状/申请书模板</div></div>';
+  html += '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:14px;">选择文书类型，按要素填写后自动生成规范文书。也可先用上方智能识别自动填充。</div>';
+  html += '<div class="ys-type-grid">';
+  YS_TYPES.forEach(function(t) {
+    var sel = ysState.selectedType === t.id ? ' selected' : '';
+    html += '<div class="ys-type-card' + sel + '" onclick="ysSelectType(\'' + t.id + '\')">';
+    html += '<div class="ys-type-icon">' + t.icon + '</div>';
+    html += '<div class="ys-type-name">' + t.name + '</div>';
+    html += '<div style="font-size:11px;color:var(--text-secondary);margin-top:3px;">' + t.type + '</div>';
+    html += '</div>';
+  });
+  html += '</div></div>';
+
+  if (ysState.selectedType) {
+    html += '<div id="ysFormArea">' + renderYsForm(ysState.selectedType) + '</div>';
+  }
+  html += '</div>';
+
+  document.getElementById('contentArea').innerHTML = html;
+}
+
+function ysSelectType(typeId) {
+  ysState.selectedType = typeId;
+  renderYaosushi();
+  setTimeout(function() {
+    var el = document.getElementById('ysFormArea');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+function renderYsForm(typeId) {
+  switch(typeId) {
+    case 'minjie': return renderYsFormMinjie();
+    case 'maimai': return renderYsFormMaimai();
+    case 'fangmaijie': return renderYsFormFangmaijie();
+    case 'fangzu': return renderYsFormFangzu();
+    case 'jinjie': return renderYsFormJinjie();
+    case 'laodong': return renderYsFormLaodong();
+    case 'lihun': return renderYsFormLihun();
+    case 'jianshe': return renderYsFormJianshe();
+    case 'jidong': return renderYsFormJidong();
+    case 'buzh': return renderYsFormBuzh();
+    case 'caisun': return renderYsFormCaisun();
+    case 'baozheng': return renderYsFormBaozheng();
+    case 'zhixing': return renderYsFormZhixing();
+    case 'yijian': return renderYsFormYijian();
+    case 'fuyi': return renderYsFormFuyi();
+    case 'canyufenpei': return renderYsFormCanyufenpei();
+    default: return '<div>暂不支持该类型</div>';
+  }
+}
+
+// ==== COMMON PARTY INFO SECTION ====
+function ysPartySection(prefix, label, showThird) {
+  var s = '<div class="ys-form-section">';
+  s += '<div class="ys-section-title">当事人信息</div>';
+  // 原告
+  s += '<div style="font-weight:600;margin-bottom:8px;font-size:14px;">' + label + '（原告）</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>姓名/名称 <span class="ys-req">*</span></label><input id="' + prefix + '_p_name" placeholder="自然人姓名或法人名称" /></div>';
+  s += '<div class="ys-field"><label>性别（自然人）</label><select id="' + prefix + '_p_gender"><option value="">—</option><option>男</option><option>女</option></select></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>联系电话</label><input id="' + prefix + '_p_phone" placeholder="联系电话" /></div>';
+  s += '<div class="ys-field"><label>证件号码</label><input id="' + prefix + '_p_idno" placeholder="身份证/统一社会信用代码" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>住所地/主要办事机构所在地</label><input id="' + prefix + '_p_addr" placeholder="详细地址" /></div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>委托诉讼代理人</label><input id="' + prefix + '_p_agent" placeholder="代理律师/法律工作者姓名" /></div>';
+  s += '<div class="ys-field"><label>代理权限</label><select id="' + prefix + '_p_agentlv"><option value="">—</option><option>一般授权</option><option>特别授权</option></select></div>';
+  s += '</div>';
+  // 被告
+  s += '<div style="font-weight:600;margin:14px 0 8px;font-size:14px;">被告</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>姓名/名称 <span class="ys-req">*</span></label><input id="' + prefix + '_d_name" placeholder="被告姓名或法人名称" /></div>';
+  s += '<div class="ys-field"><label>性别（自然人）</label><select id="' + prefix + '_d_gender"><option value="">—</option><option>男</option><option>女</option></select></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>联系电话</label><input id="' + prefix + '_d_phone" placeholder="联系电话" /></div>';
+  s += '<div class="ys-field"><label>证件号码</label><input id="' + prefix + '_d_idno" placeholder="身份证/统一社会信用代码" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>住所地/主要办事机构所在地</label><input id="' + prefix + '_d_addr" placeholder="详细地址" /></div>';
+  s += '</div>';
+  return s;
+}
+
+function ysGetV(id) {
+  var el = document.getElementById(id);
+  return el ? el.value.trim() : '';
+}
+
+function ysGetChecked(name) {
+  var els = document.querySelectorAll('input[name="' + name + '"]:checked');
+  var vals = [];
+  els.forEach(function(e) { vals.push(e.value); });
+  return vals.join('；');
+}
+
+// ==== 民间借贷纠纷 ====
+function renderYsFormMinjie() {
+  var s = '<div id="ysForm_minjie">';
+  s += ysPartySection('mj', '原告（出借方）');
+  s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>借款本金（元）</label><input id="mj_principal" type="number" placeholder="如：100000" /></div>';
+  s += '<div class="ys-field"><label>截至日期</label><input id="mj_calcdate" type="date" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>利息金额（元）</label><input id="mj_interest" type="number" placeholder="计算至截至日期" /></div>';
+  s += '<div class="ys-field"><label>是否主张至实际清偿之日</label><select id="mj_toend"><option value="是">是</option><option value="否">否</option></select></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>是否主张律师费/保全费等费用</label><input id="mj_othercost" placeholder="如：律师费、财产保全费（以实际发生为准）" /></div>';
+  s += '</div>';
+  s += '<div class="ys-form-section"><div class="ys-section-title">事实与理由（借款合同要素）</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>合同名称及签订时间</label><input id="mj_ctname" placeholder="如：借款合同，2023年1月1日" /></div>';
+  s += '<div class="ys-field"><label>签订地点</label><input id="mj_ctplace" placeholder="如：原告住所地" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>借款金额（约定）（元）</label><input id="mj_amount" type="number" placeholder="如：100000" /></div>';
+  s += '<div class="ys-field"><label>实际出借金额（元）</label><input id="mj_actual" type="number" placeholder="如：100000" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>出借方式</label><select id="mj_payway"><option>转账</option><option>现金</option><option>其他</option></select></div>';
+  s += '<div class="ys-field"><label>借款期限（起止日期）</label><input id="mj_period" placeholder="如：2023年1月1日至2024年1月1日" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>约定年利率（%）</label><input id="mj_rate" type="number" placeholder="如：10" /></div>';
+  s += '<div class="ys-field"><label>是否已到期</label><select id="mj_expired"><option>是</option><option>否</option></select></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>已还本金（元）</label><input id="mj_repaid_p" type="number" placeholder="0" /></div>';
+  s += '<div class="ys-field"><label>已还利息（元）</label><input id="mj_repaid_i" type="number" placeholder="0" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>是否有担保（保证人/抵押物等）</label><input id="mj_guarantee" placeholder="如：无；或：保证人张三，连带责任保证" /></div>';
+  s += '<div class="ys-field"><label>其他需说明事项</label><textarea id="mj_other"></textarea></div>';
+  s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="mj_basis" value="《中华人民共和国民法典》第六百七十四条、第六百七十五条、第六百七十六条" /></div>';
+  s += '</div>';
+  s += '<div style="text-align:center;margin:20px 0;">';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'minjie\')">📄 生成要素式诉状</button>';
+  s += '</div>';
+  s += '<div id="ysPreview_minjie"></div></div>';
+  return s;
+}
+
+// ==== 买卖合同纠纷 ====
+function renderYsFormMaimai() {
+  var s = '<div id="ysForm_maimai">';
+  s += ysPartySection('mm', '原告');
+  s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>原告角色</label><select id="mm_role"><option value="卖方">原告为卖方（主张价款）</option><option value="买方">原告为买方（主张违约）</option></select></div>';
+  s += '<div class="ys-field"><label>主张金额（元）</label><input id="mm_claim" type="number" placeholder="主张的款项总额" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>利息/违约金计算方式</label><input id="mm_interest" placeholder="如：以XX元为基数，自XX日起按年利率6%计算" /></div>';
+  s += '<div class="ys-field"><label>是否要求解除合同</label><select id="mm_dissolve"><option>否</option><option>是</option></select></div>';
+  s += '<div class="ys-field"><label>是否主张律师费等费用</label><input id="mm_othercost" placeholder="如：律师费100000元" /></div>';
+  s += '</div>';
+  s += '<div class="ys-form-section"><div class="ys-section-title">事实与理由（买卖合同要素）</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>合同名称及签订时间</label><input id="mm_ctname" placeholder="如：买卖合同，2023年1月1日" /></div>';
+  s += '<div class="ys-field"><label>标的物名称/规格/数量</label><input id="mm_goods" placeholder="如：GB×××混凝土500吨" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>合同约定总价（元）</label><input id="mm_totalprice" type="number" /></div>';
+  s += '<div class="ys-field"><label>付款方式</label><select id="mm_payway"><option>转账</option><option>现金</option><option>分期付款</option></select></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>已付价款（元）</label><input id="mm_paid" type="number" placeholder="0" /></div>';
+  s += '<div class="ys-field"><label>逾期未付款（元）</label><input id="mm_unpaid" type="number" placeholder="0" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>是否存在迟延履行</label><select id="mm_delay"><option>是</option><option>否</option></select></div>';
+  s += '<div class="ys-field"><label>是否催促过履行</label><select id="mm_urge"><option>是</option><option>否</option></select></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>催促情况说明</label><input id="mm_urgedesc" placeholder="如：2024年3月发催款函" /></div>';
+  s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="mm_basis" value="《中华人民共和国民法典》第五百七十七条、第六百二十六条" /></div>';
+  s += '</div>';
+  s += '<div style="text-align:center;margin:20px 0;">';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'maimai\')">📄 生成要素式诉状</button></div>';
+  s += '<div id="ysPreview_maimai"></div></div>';
+  return s;
+}
+
+// ==== 房屋买卖合同纠纷 ====
+function renderYsFormFangmaijie() {
+  var s = '<div id="ysForm_fangmaijie">';
+  s += ysPartySection('fmj', '原告');
+  s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>主张确认合同关系</label><select id="fmj_ctclaim"><option>继续履行</option><option>解除合同</option><option>确认合同无效</option><option>撤销合同</option><option>无此问题</option></select></div>';
+  s += '<div class="ys-field"><label>主张购房款处理</label><select id="fmj_payclaim"><option>支付欠付房款</option><option>返还已付款</option><option>无此问题</option></select></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>主张交付/返还房屋</label><select id="fmj_houclaim"><option>无此问题</option><option>交付房屋</option><option>返还房屋</option></select></div>';
+  s += '<div class="ys-field"><label>主张办理不动产登记</label><select id="fmj_regclaim"><option>是</option><option>否</option></select></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>主张金额/违约金（元）</label><input id="fmj_money" type="number" /></div>';
+  s += '<div class="ys-field"><label>是否主张诉讼费</label><select id="fmj_suitfee"><option>是</option><option>否</option></select></div>';
+  s += '</div></div>';
+  s += '<div class="ys-form-section"><div class="ys-section-title">房屋买卖合同基本情况</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>合同订立时间</label><input id="fmj_ctdate" type="date" /></div>';
+  s += '<div class="ys-field"><label>房屋性质</label><select id="fmj_htype"><option>商品房</option><option>经济适用房</option><option>自建房</option><option>其他</option></select></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>房屋坐落</label><input id="fmj_hloc" placeholder="房屋地址" /></div>';
+  s += '<div class="ys-field"><label>房屋面积（㎡）</label><input id="fmj_harea" type="number" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>合同总价（元）</label><input id="fmj_totalprice" type="number" /></div>';
+  s += '<div class="ys-field"><label>已支付金额（元）</label><input id="fmj_paid" type="number" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>是否已实际交付房屋</label><select id="fmj_delivered"><option>否</option><option>是</option></select></div>';
+  s += '<div class="ys-field"><label>是否已办理不动产登记</label><select id="fmj_registered"><option>否</option><option>是</option></select></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>合同解除/撤销事由</label><textarea id="fmj_dissolvereason" rows="2" placeholder="如：出卖方逾期交房超过90天"></textarea></div>';
+  s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="fmj_basis" value="《中华人民共和国民法典》第五百六十三条、第五百七十七条" /></div>';
+  s += '</div>';
+  s += '<div style="text-align:center;margin:20px 0;">';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'fangmaijie\')">📄 生成要素式诉状</button></div>';
+  s += '<div id="ysPreview_fangmaijie"></div></div>';
+  return s;
+}
+
+// ==== 房屋租赁合同纠纷 ====
+function renderYsFormFangzu() {
+  var s = '<div id="ysForm_fangzu">';
+  s += ysPartySection('fz', '原告');
+  s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>原告角色</label><select id="fz_role"><option>出租方</option><option>承租方</option></select></div>';
+  s += '<div class="ys-field"><label>是否要求解除合同</label><select id="fz_dissolve"><option>是</option><option>否</option></select></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>欠付租金（元）</label><input id="fz_rent" type="number" /></div>';
+  s += '<div class="ys-field"><label>押金金额（元）</label><input id="fz_deposit" type="number" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>其他费用（水电费/占有使用费等）</label><input id="fz_otherfee" placeholder="如：水电费1000元、房屋占有使用费3000元/月" /></div>';
+  s += '</div>';
+  s += '<div class="ys-form-section"><div class="ys-section-title">房屋租赁合同要素</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>合同签订时间</label><input id="fz_ctdate" type="date" /></div>';
+  s += '<div class="ys-field"><label>租赁房屋地址</label><input id="fz_hloc" placeholder="房屋坐落" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>租金（元/月）</label><input id="fz_rentmonth" type="number" /></div>';
+  s += '<div class="ys-field"><label>租赁期限</label><input id="fz_period" placeholder="如：2022年1月1日至2024年12月31日" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>欠付租金起始日</label><input id="fz_owestart" placeholder="自何时开始欠付租金" /></div>';
+  s += '<div class="ys-field"><label>欠付租金截至日</label><input id="fz_oweend" placeholder="截至起诉时" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="fz_basis" value="《中华人民共和国民法典》第七百零三条、第七百二十二条" /></div>';
+  s += '</div>';
+  s += '<div style="text-align:center;margin:20px 0;">';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'fangzu\')">📄 生成要素式诉状</button></div>';
+  s += '<div id="ysPreview_fangzu"></div></div>';
+  return s;
+}
+
+// ==== 金融借款合同纠纷 ====
+function renderYsFormJinjie() {
+  var s = '<div id="ysForm_jinjie">';
+  s += ysPartySection('jj', '原告（贷款方）');
+  s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>借款本金（元）</label><input id="jj_principal" type="number" /></div>';
+  s += '<div class="ys-field"><label>截至计算日期</label><input id="jj_calcdate" type="date" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>期内利息（元）</label><input id="jj_interest" type="number" placeholder="0" /></div>';
+  s += '<div class="ys-field"><label>罚息/违约金（元）</label><input id="jj_penalty" type="number" placeholder="0" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>复利（元）</label><input id="jj_compound" type="number" placeholder="0" /></div>';
+  s += '<div class="ys-field"><label>是否主张担保权利</label><select id="jj_guarantee"><option>否</option><option>是</option></select></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>担保权利内容</label><input id="jj_guaranteecontent" placeholder="如：对抵押物享有抵押权，请求优先受偿" /></div>';
+  s += '</div>';
+  s += '<div class="ys-form-section"><div class="ys-section-title">金融借款合同要素</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>合同名称及签订时间</label><input id="jj_ctname" placeholder="如：借款合同，2022年3月1日" /></div>';
+  s += '<div class="ys-field"><label>借款金额（约定）（元）</label><input id="jj_loanamount" type="number" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>借款期限</label><input id="jj_period" placeholder="如：2022年3月1日至2023年3月1日" /></div>';
+  s += '<div class="ys-field"><label>约定利率（%/年）</label><input id="jj_rate" type="number" placeholder="如：6" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>还款方式</label><select id="jj_repayway"><option>等额本息</option><option>等额本金</option><option>到期一次性还本付息</option><option>按月计息到期还本</option></select></div>';
+  s += '<div class="ys-field"><label>已还本金（元）</label><input id="jj_repaid" type="number" placeholder="0" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>担保情况（抵押/质押/保证）</label><input id="jj_security" placeholder="如：以XX房产抵押，抵押人XX，已办理抵押登记" /></div>';
+  s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="jj_basis" value="《中华人民共和国民法典》第六百七十四条、第六百七十五条" /></div>';
+  s += '</div>';
+  s += '<div style="text-align:center;margin:20px 0;">';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'jinjie\')">📄 生成要素式诉状</button></div>';
+  s += '<div id="ysPreview_jinjie"></div></div>';
+  return s;
+}
+
+// ==== 劳动争议 ====
+function renderYsFormLaodong() {
+  var s = '<div id="ysForm_laodong">';
+  s += ysPartySection('ld', '原告（劳动者）');
+  s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
+  s += '<div class="ys-grid-3">';
+  s += '<div class="ys-field"><label>主张工资支付</label><select id="ld_wage"><option>否</option><option>是</option></select></div>';
+  s += '<div class="ys-field"><label>工资金额（元）</label><input id="ld_wageval" type="number" /></div>';
+  s += '<div class="ys-field"><label>主张双倍工资</label><select id="ld_double"><option>否</option><option>是</option></select></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-3">';
+  s += '<div class="ys-field"><label>双倍工资金额（元）</label><input id="ld_doubleval" type="number" /></div>';
+  s += '<div class="ys-field"><label>主张加班费</label><select id="ld_overtime"><option>否</option><option>是</option></select></div>';
+  s += '<div class="ys-field"><label>加班费金额（元）</label><input id="ld_overtimeval" type="number" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-3">';
+  s += '<div class="ys-field"><label>主张经济补偿</label><select id="ld_compensation"><option>是</option><option>否</option></select></div>';
+  s += '<div class="ys-field"><label>经济补偿金额（元）</label><input id="ld_compensationval" type="number" /></div>';
+  s += '<div class="ys-field"><label>主张赔偿金（违法解除）</label><select id="ld_damages"><option>否</option><option>是</option></select></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>其他诉求</label><input id="ld_other" placeholder="如：年假工资等" /></div>';
+  s += '</div>';
+  s += '<div class="ys-form-section"><div class="ys-section-title">劳动关系要素</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>入职时间</label><input id="ld_startdate" type="date" /></div>';
+  s += '<div class="ys-field"><label>离职/终止时间</label><input id="ld_enddate" type="date" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>从事工作岗位</label><input id="ld_position" placeholder="如：销售员、清洁工" /></div>';
+  s += '<div class="ys-field"><label>约定月工资（元）</label><input id="ld_salary" type="number" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>是否签订劳动合同</label><select id="ld_hasct"><option>否</option><option>是</option></select></div>';
+  s += '<div class="ys-field"><label>解除/终止原因</label><input id="ld_endreason" placeholder="如：用人单位不同意续签" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>仲裁情况（裁决书/裁决内容）</label><textarea id="ld_arbitration" placeholder="如：XX仲裁委XX号裁决书，裁决内容……" rows="2"></textarea></div>';
+  s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="ld_basis" value="《中华人民共和国劳动合同法》第七条、第十条、第四十六条、第八十二条" /></div>';
+  s += '</div>';
+  s += '<div style="text-align:center;margin:20px 0;">';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'laodong\')">📄 生成要素式诉状</button></div>';
+  s += '<div id="ysPreview_laodong"></div></div>';
+  return s;
+}
+
+// ==== 离婚纠纷 ====
+function renderYsFormLihun() {
+  var s = '<div id="ysForm_lihun">';
+  s += ysPartySection('lh', '原告');
+  s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
+  s += '<div class="ys-field"><label>解除婚姻关系（具体主张）</label><input id="lh_divorceclaim" value="判决原告与被告离婚" /></div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>夫妻共同财产处理</label><input id="lh_property" placeholder="如：房屋归原告，汽车归被告" /></div>';
+  s += '<div class="ys-field"><label>夫妻共同债务处理</label><input id="lh_debt" placeholder="如：无/由被告承担" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>子女抚养（子女姓名/归属）</label><input id="lh_child" placeholder="如：子女甲归原告直接抚养" /></div>';
+  s += '<div class="ys-field"><label>抚养费</label><input id="lh_childcost" placeholder="如：被告每月支付1000元抚养费" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>探望权安排</label><input id="lh_visit" placeholder="如：被告每月探望两次" /></div>';
+  s += '<div class="ys-field"><label>离婚损害赔偿/经济补偿</label><input id="lh_damages" placeholder="如：被告支付损害赔偿10万元" /></div>';
+  s += '</div></div>';
+  s += '<div class="ys-form-section"><div class="ys-section-title">婚姻关系要素</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>结婚时间</label><input id="lh_marrdate" type="date" /></div>';
+  s += '<div class="ys-field"><label>子女情况</label><input id="lh_children" placeholder="如：婚生子女一人，名XX，生于XX年" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>离婚事由</label><textarea id="lh_reason" rows="3" placeholder="如：双方感情破裂，被告存在家庭暴力行为……"></textarea></div>';
+  s += '<div class="ys-field"><label>之前是否起诉过离婚</label><select id="lh_prev"><option>否</option><option>是</option></select></div>';
+  s += '<div class="ys-field"><label>共同财产情况</label><textarea id="lh_assets" rows="2" placeholder="如：房屋一套、车辆一辆、存款XX元"></textarea></div>';
+  s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="lh_basis" value="《中华人民共和国民法典》第一千零七十九条、第一千零八十七条" /></div>';
+  s += '</div>';
+  s += '<div style="text-align:center;margin:20px 0;">';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'lihun\')">📄 生成要素式诉状</button></div>';
+  s += '<div id="ysPreview_lihun"></div></div>';
+  return s;
+}
+
+// ==== 建设工程施工合同纠纷 ====
+function renderYsFormJianshe() {
+  var s = '<div id="ysForm_jianshe">';
+  s += ysPartySection('js', '原告');
+  s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>主张支付工程款（元）</label><input id="js_claim" type="number" /></div>';
+  s += '<div class="ys-field"><label>利息/违约金计算方式</label><input id="js_interest" placeholder="如：以XX元为基数，自竣工之日起按年利率X%计算" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>是否主张优先受偿权</label><select id="js_priority"><option>否</option><option>是</option></select></div>';
+  s += '<div class="ys-field"><label>是否主张律师费等</label><input id="js_othercost" /></div>';
+  s += '</div></div>';
+  s += '<div class="ys-form-section"><div class="ys-section-title">建设工程合同要素</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>合同名称及签订时间</label><input id="js_ctname" placeholder="如：建设工程施工合同，2021年1月" /></div>';
+  s += '<div class="ys-field"><label>工程名称及地点</label><input id="js_projname" placeholder="如：XX大厦建设工程" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>合同价款（元）</label><input id="js_totalprice" type="number" /></div>';
+  s += '<div class="ys-field"><label>是否有资质</label><select id="js_qualify"><option>是</option><option>否（挂靠/转包）</option></select></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>竣工验收情况</label><input id="js_accept" placeholder="如：已于XX年竣工验收合格" /></div>';
+  s += '<div class="ys-field"><label>已付工程款（元）</label><input id="js_paid" type="number" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>工程质量情况</label><input id="js_quality" placeholder="如：符合验收标准，无质量争议" /></div>';
+  s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="js_basis" value="《中华人民共和国民法典》第七百九十三条、《建设工程司法解释（一）》第3条" /></div>';
+  s += '</div>';
+  s += '<div style="text-align:center;margin:20px 0;">';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'jianshe\')">📄 生成要素式诉状</button></div>';
+  s += '<div id="ysPreview_jianshe"></div></div>';
+  return s;
+}
+
+// ==== 机动车交通事故 ====
+function renderYsFormJidong() {
+  var s = '<div id="ysForm_jidong">';
+  s += ysPartySection('jd', '原告（受害方）');
+  s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求（赔偿项目）</div>';
+  s += '<div class="ys-grid-3">';
+  s += '<div class="ys-field"><label>医疗费（元）</label><input id="jd_medical" type="number" placeholder="0" /></div>';
+  s += '<div class="ys-field"><label>误工费（元）</label><input id="jd_lostwork" type="number" placeholder="0" /></div>';
+  s += '<div class="ys-field"><label>护理费（元）</label><input id="jd_nursing" type="number" placeholder="0" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-3">';
+  s += '<div class="ys-field"><label>残疾赔偿金（元）</label><input id="jd_disability" type="number" placeholder="0" /></div>';
+  s += '<div class="ys-field"><label>死亡赔偿金（元）</label><input id="jd_death" type="number" placeholder="0" /></div>';
+  s += '<div class="ys-field"><label>精神损害抚慰金（元）</label><input id="jd_spirit" type="number" placeholder="0" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-3">';
+  s += '<div class="ys-field"><label>交通费（元）</label><input id="jd_transport" type="number" placeholder="0" /></div>';
+  s += '<div class="ys-field"><label>住院伙食补助（元）</label><input id="jd_food" type="number" placeholder="0" /></div>';
+  s += '<div class="ys-field"><label>财产损失（元）</label><input id="jd_property" type="number" placeholder="0" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>其他赔偿项目</label><input id="jd_other" placeholder="如：营养费、被扶养人生活费等" /></div>';
+  s += '</div>';
+  s += '<div class="ys-form-section"><div class="ys-section-title">交通事故要素</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>事故发生时间</label><input id="jd_accdate" type="date" /></div>';
+  s += '<div class="ys-field"><label>事故发生地点</label><input id="jd_accloc" placeholder="具体地址" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>责任认定情况</label><input id="jd_liability" placeholder="如：被告负主要责任（70%）" /></div>';
+  s += '<div class="ys-field"><label>伤残等级</label><input id="jd_injurylevel" placeholder="如：X级伤残" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>保险公司（第三者责任险）</label><input id="jd_insco" placeholder="被告车辆承保的保险公司" /></div>';
+  s += '<div class="ys-field"><label>保险赔付情况</label><input id="jd_inspaid" placeholder="如：已赔付X元，尚欠X元" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="jd_basis" value="《中华人民共和国民法典》第一千二百零八条、《最高院关于审理道路交通事故损害赔偿案件适用法律若干问题的解释》" /></div>';
+  s += '</div>';
+  s += '<div style="text-align:center;margin:20px 0;">';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'jidong\')">📄 生成要素式诉状</button></div>';
+  s += '<div id="ysPreview_jidong"></div></div>';
+  return s;
+}
+
+// ==== 不正当竞争纠纷 ====
+function renderYsFormBuzh() {
+  var s = '<div id="ysForm_buzh">';
+  s += ysPartySection('bz', '原告');
+  s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
+  s += '<div class="ys-field"><label>不正当竞争行为类型</label><select id="bz_acttype"><option>仿冒混淆</option><option>商业诋毁</option><option>虚假宣传</option><option>侵犯商业秘密</option><option>其他</option></select></div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>是否要求停止侵权行为</label><select id="bz_stop"><option>是</option><option>否</option></select></div>';
+  s += '<div class="ys-field"><label>主张赔偿金额（元）</label><input id="bz_damages" type="number" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>是否主张消除影响/赔礼道歉</label><select id="bz_apologize"><option>否</option><option>是</option></select></div>';
+  s += '<div class="ys-field"><label>是否主张合理费用（律师费等）</label><input id="bz_costs" type="number" placeholder="元" /></div>';
+  s += '</div></div>';
+  s += '<div class="ys-form-section"><div class="ys-section-title">不正当竞争事实要素</div>';
+  s += '<div class="ys-field"><label>被告不正当竞争行为描述</label><textarea id="bz_actdesc" rows="3" placeholder="如：被告使用与原告相同或近似的商业标识，足以引起混淆……"></textarea></div>';
+  s += '<div class="ys-field"><label>原告遭受的损失情况</label><textarea id="bz_loss" rows="2" placeholder="如：市场份额下降，营业额减少XX元"></textarea></div>';
+  s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="bz_basis" value="《中华人民共和国反不正当竞争法》第六条、第十七条" /></div>';
+  s += '</div>';
+  s += '<div style="text-align:center;margin:20px 0;">';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'buzh\')">📄 生成要素式诉状</button></div>';
+  s += '<div id="ysPreview_buzh"></div></div>';
+  return s;
+}
+
+// ==== 财产损失保险合同纠纷 ====
+function renderYsFormCaisun() {
+  var s = '<div id="ysForm_caisun">';
+  s += ysPartySection('cs', '原告（被保险人）');
+  s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>主张保险赔偿金（元）</label><input id="cs_claim" type="number" /></div>';
+  s += '<div class="ys-field"><label>是否主张利息</label><select id="cs_interest"><option>是</option><option>否</option></select></div>';
+  s += '</div></div>';
+  s += '<div class="ys-form-section"><div class="ys-section-title">保险合同要素</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>保险单号</label><input id="cs_policyno" /></div>';
+  s += '<div class="ys-field"><label>保险标的</label><input id="cs_subject" placeholder="如：位于XX的房屋" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>保险金额（元）</label><input id="cs_suminsured" type="number" /></div>';
+  s += '<div class="ys-field"><label>保险期限</label><input id="cs_period" placeholder="如：2022年1月1日至2023年1月1日" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>出险情况（时间、原因、损失）</label><textarea id="cs_incident" rows="2" placeholder="如：2022年6月1日因火灾导致房屋损毁，损失估算XX万元"></textarea></div>';
+  s += '<div class="ys-field"><label>被告拒赔/少赔原因</label><input id="cs_refusereason" placeholder="如：以免赔条款为由拒绝赔偿" /></div>';
+  s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="cs_basis" value="《中华人民共和国保险法》第十三条、第二十三条" /></div>';
+  s += '</div>';
+  s += '<div style="text-align:center;margin:20px 0;">';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'caisun\')">📄 生成要素式诉状</button></div>';
+  s += '<div id="ysPreview_caisun"></div></div>';
+  return s;
+}
+
+// ==== 保证保险合同纠纷（答辩状） ====
+function renderYsFormBaozheng() {
+  var s = '<div id="ysForm_baozheng">';
+  s += '<div class="ys-form-section"><div class="ys-section-title">答辩人信息</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>答辩人名称</label><input id="bzd_name" placeholder="答辩人（被告）" /></div>';
+  s += '<div class="ys-field"><label>联系电话</label><input id="bzd_phone" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>地址</label><input id="bzd_addr" /></div>';
+  s += '</div>';
+  s += '<div class="ys-form-section"><div class="ys-section-title">答辩意见</div>';
+  s += '<div class="ys-field"><label>案件基本情况（保证保险合同）</label><textarea id="bzd_facts" rows="3" placeholder="如：答辩人作为被保险人，就借款合同项下债务购买保证保险……" /></div>';
+  s += '<div class="ys-field"><label>答辩理由1</label><textarea id="bzd_r1" rows="2" placeholder="如：原告请求缺乏合同依据……" /></div>';
+  s += '<div class="ys-field"><label>答辩理由2</label><textarea id="bzd_r2" rows="2" placeholder="如：免赔条款应当适用……" /></div>';
+  s += '<div class="ys-field"><label>答辩理由3</label><textarea id="bzd_r3" rows="2" /></div>';
+  s += '<div class="ys-field"><label>答辩结论</label><input id="bzd_conclusion" value="请求依法驳回原告的诉讼请求" /></div>';
+  s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="bzd_basis" value="《中华人民共和国保险法》" /></div>';
+  s += '</div>';
+  s += '<div style="text-align:center;margin:20px 0;">';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'baozheng\')">📄 生成要素式答辩状</button></div>';
+  s += '<div id="ysPreview_baozheng"></div></div>';
+  return s;
+}
+
+// ==== 强制执行申请书 ====
+function renderYsFormZhixing() {
+  var s = '<div id="ysForm_zhixing">';
+  s += '<div class="ys-form-section"><div class="ys-section-title">申请人信息</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>申请人姓名/名称</label><input id="zx_pname" /></div>';
+  s += '<div class="ys-field"><label>联系电话</label><input id="zx_pphone" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>地址</label><input id="zx_paddr" /></div>';
+  s += '</div>';
+  s += '<div class="ys-form-section"><div class="ys-section-title">被执行人信息</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>被执行人姓名/名称</label><input id="zx_dname" /></div>';
+  s += '<div class="ys-field"><label>联系电话</label><input id="zx_dphone" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>地址</label><input id="zx_daddr" /></div>';
+  s += '</div>';
+  s += '<div class="ys-form-section"><div class="ys-section-title">执行依据及申请内容</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>执行依据（判决书/调解书等）</label><input id="zx_basis" placeholder="如：XX法院（20XX）XX民初XXXX号民事判决书" /></div>';
+  s += '<div class="ys-field"><label>判决生效时间</label><input id="zx_effdate" type="date" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>申请执行标的（金钱/行为/财产）</label><textarea id="zx_target" rows="2" placeholder="如：申请执行被执行人偿还借款本金XX元及利息XX元" /></div>';
+  s += '<div class="ys-field"><label>被执行人已知财产线索</label><textarea id="zx_assets" rows="2" placeholder="如：银行账户XX、房产XX等" /></div>';
+  s += '</div>';
+  s += '<div style="text-align:center;margin:20px 0;">';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'zhixing\')">📄 生成强制执行申请书</button></div>';
+  s += '<div id="ysPreview_zhixing"></div></div>';
+  return s;
+}
+
+// ==== 执行异议申请书 ====
+function renderYsFormYijian() {
+  var s = '<div id="ysForm_yijian">';
+  s += '<div class="ys-form-section"><div class="ys-section-title">申请人信息</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>申请人姓名/名称</label><input id="yj_pname" /></div>';
+  s += '<div class="ys-field"><label>联系电话</label><input id="yj_pphone" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>地址</label><input id="yj_paddr" /></div>';
+  s += '</div>';
+  s += '<div class="ys-form-section"><div class="ys-section-title">异议内容</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>执行案号</label><input id="yj_caseno" placeholder="如：（20XX）XX执XXXX号" /></div>';
+  s += '<div class="ys-field"><label>异议类型</label><select id="yj_type"><option>对执行标的提出异议</option><option>对执行行为提出异议</option><option>案外人执行异议</option></select></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>异议事实与理由</label><textarea id="yj_reason" rows="4" placeholder="详细描述异议事实和法律依据" /></div>';
+  s += '<div class="ys-field"><label>申请请求</label><textarea id="yj_request" rows="2" placeholder="如：请求撤销对XX财产的查封措施" /></div>';
+  s += '<div class="ys-field"><label>请求依据</label><input id="yj_basis" value="《中华人民共和国民事诉讼法》第二百三十六条" /></div>';
+  s += '</div>';
+  s += '<div style="text-align:center;margin:20px 0;">';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'yijian\')">📄 生成执行异议申请书</button></div>';
+  s += '<div id="ysPreview_yijian"></div></div>';
+  return s;
+}
+
+// ==== 执行复议申请书 ====
+function renderYsFormFuyi() {
+  var s = '<div id="ysForm_fuyi">';
+  s += '<div class="ys-form-section"><div class="ys-section-title">申请人信息</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>申请人姓名/名称</label><input id="fy_pname" /></div>';
+  s += '<div class="ys-field"><label>联系电话</label><input id="fy_pphone" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>地址</label><input id="fy_paddr" /></div>';
+  s += '</div>';
+  s += '<div class="ys-form-section"><div class="ys-section-title">复议内容</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>执行案号</label><input id="fy_caseno" placeholder="如：（20XX）XX执XXXX号" /></div>';
+  s += '<div class="ys-field"><label>原裁定/决定作出法院</label><input id="fy_court" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>被复议的具体裁定/措施</label><input id="fy_subject" placeholder="如：XX法院作出的查封裁定" /></div>';
+  s += '<div class="ys-field"><label>复议理由</label><textarea id="fy_reason" rows="4" placeholder="该裁定认定事实有误/适用法律错误……" /></div>';
+  s += '<div class="ys-field"><label>申请请求</label><textarea id="fy_request" rows="2" placeholder="如：请求上级法院撤销原裁定，解除查封" /></div>';
+  s += '<div class="ys-field"><label>请求依据</label><input id="fy_basis" value="《中华人民共和国民事诉讼法》第二百三十八条" /></div>';
+  s += '</div>';
+  s += '<div style="text-align:center;margin:20px 0;">';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'fuyi\')">📄 生成执行复议申请书</button></div>';
+  s += '<div id="ysPreview_fuyi"></div></div>';
+  return s;
+}
+
+// ==== 参与分配申请书 ====
+function renderYsFormCanyufenpei() {
+  var s = '<div id="ysForm_canyufenpei">';
+  s += '<div class="ys-form-section"><div class="ys-section-title">申请人信息</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>申请人姓名/名称</label><input id="cy_pname" /></div>';
+  s += '<div class="ys-field"><label>联系电话</label><input id="cy_pphone" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>地址</label><input id="cy_paddr" /></div>';
+  s += '</div>';
+  s += '<div class="ys-form-section"><div class="ys-section-title">参与分配内容</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>执行法院及案号</label><input id="cy_caseno" placeholder="如：XX法院（20XX）XX执XXXX号" /></div>';
+  s += '<div class="ys-field"><label>被执行人</label><input id="cy_debtor" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>申请人债权依据</label><input id="cy_creditmain" placeholder="如：（20XX）XX民初XXXX号判决书" /></div>';
+  s += '<div class="ys-field"><label>债权金额（元）</label><input id="cy_creditamt" type="number" /></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>参与分配理由</label><textarea id="cy_reason" rows="3" placeholder="被执行人财产不足以清偿全部债务，申请人系被执行人的普通债权人，申请参与案款分配……" /></div>';
+  s += '<div class="ys-field"><label>请求依据</label><input id="cy_basis" value="《最高人民法院关于适用〈民事诉讼法〉执行程序若干问题的解释》第29条" /></div>';
+  s += '</div>';
+  s += '<div style="text-align:center;margin:20px 0;">';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'canyufenpei\')">📄 生成参与分配申请书</button></div>';
+  s += '<div id="ysPreview_canyufenpei"></div></div>';
+  return s;
+}
+
+// ==== GENERATE DOCUMENT ====
+function ysGenerate(typeId) {
+  var previewId = 'ysPreview_' + typeId;
+  var html = '';
+  try {
+    html = ysGenDoc(typeId);
+  } catch(e) {
+    html = '<div style="color:red;padding:10px;">生成出错：' + e.message + '</div>';
+  }
+  document.getElementById(previewId).innerHTML = html;
+  setTimeout(function() {
+    var el = document.getElementById(previewId);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+function ysDocHeader(title, cause, note) {
+  var d = new Date();
+  var dateStr = d.getFullYear() + '年' + (d.getMonth()+1) + '月' + d.getDate() + '日';
+  return '<div class="ys-preview">' +
+    '<div style="text-align:right;font-size:12px;color:#888;margin-bottom:10px;">生成日期：' + dateStr + '</div>' +
+    '<h2>' + title + '</h2>' +
+    (cause ? '<div class="ys-cause">（' + cause + '）</div>' : '') +
+    (note ? '<div style="font-size:12px;color:#888;text-align:center;margin-bottom:16px;">' + note + '</div>' : '');
+}
+
+function ysDocTable(rows) {
+  var html = '<table class="ys-preview-table">';
+  rows.forEach(function(r) {
+    if (r.length === 1) {
+      html += '<tr><td colspan="2" style="background:#f0eee4;font-weight:700;padding:9px 12px;font-size:14px;">' + r[0] + '</td></tr>';
+    } else {
+      html += '<tr><td>' + r[0] + '</td><td>' + (r[1] || '') + '</td></tr>';
+    }
+  });
+  html += '</table>';
+  return html;
+}
+
+function ysCopyBtn(typeId) {
+  return '<div style="text-align:center;margin-top:20px;display:flex;gap:12px;justify-content:center;">' +
+    '<button class="btn btn-outline" onclick="ysCopyText(\'' + typeId + '\')">📋 复制文本</button>' +
+    '<button class="btn btn-primary" onclick="ysPrint(\'' + typeId + '\')">🖨️ 打印</button>' +
+    '</div>';
+}
+
+function ysGenDoc(typeId) {
+  switch(typeId) {
+    case 'minjie': return ysGenMinjie();
+    case 'maimai': return ysGenMaimai();
+    case 'fangmaijie': return ysGenFangmaijie();
+    case 'fangzu': return ysGenFangzu();
+    case 'jinjie': return ysGenJinjie();
+    case 'laodong': return ysGenLaodong();
+    case 'lihun': return ysGenLihun();
+    case 'jianshe': return ysGenJianshe();
+    case 'jidong': return ysGenJidong();
+    case 'buzh': return ysGenBuzh();
+    case 'caisun': return ysGenCaisun();
+    case 'baozheng': return ysGenBaozheng();
+    case 'zhixing': return ysGenZhixing();
+    case 'yijian': return ysGenYijian();
+    case 'fuyi': return ysGenFuyi();
+    case 'canyufenpei': return ysGenCanyufenpei();
+    default: return '';
+  }
+}
+
+function ysGenMinjie() {
+  var p = ysGetV('mj_p_name'), d = ysGetV('mj_d_name');
+  if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
+  var principal = ysGetV('mj_principal'), interest = ysGetV('mj_interest');
+  var calcdate = ysGetV('mj_calcdate'), toend = ysGetV('mj_toend');
+  var othercost = ysGetV('mj_othercost');
+  var ctname = ysGetV('mj_ctname'), ctplace = ysGetV('mj_ctplace');
+  var amount = ysGetV('mj_amount'), actual = ysGetV('mj_actual');
+  var payway = ysGetV('mj_payway'), period = ysGetV('mj_period'), rate = ysGetV('mj_rate');
+  var expired = ysGetV('mj_expired'), repaidp = ysGetV('mj_repaid_p'), repaidi = ysGetV('mj_repaid_i');
+  var guarantee = ysGetV('mj_guarantee'), other = ysGetV('mj_other'), basis = ysGetV('mj_basis');
+  var paddr = ysGetV('mj_p_addr'), pphone = ysGetV('mj_p_phone');
+  var daddr = ysGetV('mj_d_addr'), dphone = ysGetV('mj_d_phone');
+  var pagent = ysGetV('mj_p_agent'), pagentlv = ysGetV('mj_p_agentlv');
+
+  var html = ysDocHeader('民事起诉状', '民间借贷纠纷');
+  html += ysDocTable([
+    ['具状人（签字、盖章）：' + p + '　　日期：　　年　　月　　日'],
+  ]);
+  html += '<br>';
+  html += ysDocTable([
+    ['★说明★ 本表为要素式诉状，请如实填写各要素项目。'],
+    ['当事人信息'],
+    ['原告（姓名/名称）', p],
+    ['住所地', paddr || '——'],
+    ['联系电话', pphone || '——'],
+    ['委托诉讼代理人', pagent ? pagent + '（' + pagentlv + '）' : '无'],
+    ['被告（姓名/名称）', d],
+    ['住所地', daddr || '——'],
+    ['联系电话', dphone || '——'],
+    ['诉讼请求'],
+    ['1. 本金', '截至' + (calcdate || '起诉之日') + '止，尚欠本金 ' + (principal || '______') + ' 元（人民币）'],
+    ['2. 利息', '截至' + (calcdate || '起诉之日') + '止，尚欠利息 ' + (interest || '______') + ' 元；是否请求支付至实际清偿之日止：' + toend],
+    ['3. 其他费用', othercost || '无'],
+    ['约定管辖和诉前保全'],
+    ['有无仲裁/法院管辖约定', '无（如有请另注明）'],
+    ['是否已经诉前保全', '否（如有请另注明保全案号）'],
+    ['事实与理由'],
+    ['1. 合同名称及签订情况', ctname || '——'],
+    ['2. 签订地点', ctplace || '——'],
+    ['3. 借款金额（约定）', (amount || '——') + ' 元；实际出借：' + (actual || '——') + ' 元；方式：' + payway],
+    ['4. 借款期限', period || '——；是否到期：' + expired],
+    ['5. 约定利率', rate ? rate + '%/年' : '——'],
+    ['6. 还款情况', '已还本金：' + (repaidp||'0') + '元；已还利息：' + (repaidi||'0') + '元'],
+    ['7. 担保情况', guarantee || '无'],
+    ['8. 其他说明', other || '无'],
+    ['9. 请求依据', basis],
+  ]);
+  html += '<div class="ys-preview-signature">具状人：' + p + '<br>日期：　　年　　月　　日</div>';
+  html += ysCopyBtn('minjie') + '</div>';
+  return html;
+}
+
+function ysGenMaimai() {
+  var p = ysGetV('mm_p_name'), d = ysGetV('mm_d_name');
+  if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
+  var role = ysGetV('mm_role'), claim = ysGetV('mm_claim'), interest = ysGetV('mm_interest');
+  var dissolve = ysGetV('mm_dissolve'), othercost = ysGetV('mm_othercost');
+  var ctname = ysGetV('mm_ctname'), goods = ysGetV('mm_goods');
+  var totalprice = ysGetV('mm_totalprice'), payway = ysGetV('mm_payway');
+  var paid = ysGetV('mm_paid'), unpaid = ysGetV('mm_unpaid');
+  var delay = ysGetV('mm_delay'), urge = ysGetV('mm_urge'), urgedesc = ysGetV('mm_urgedesc');
+  var basis = ysGetV('mm_basis');
+
+  var html = ysDocHeader('民事起诉状', '买卖合同纠纷');
+  html += ysDocTable([
+    ['具状人（签字、盖章）：' + p + '　　日期：　　年　　月　　日'],
+  ]);
+  html += '<br>';
+  html += ysDocTable([
+    ['当事人信息'],
+    ['原告（姓名/名称）', p],
+    ['原告角色', role],
+    ['住所地', ysGetV('mm_p_addr') || '——'],
+    ['联系电话', ysGetV('mm_p_phone') || '——'],
+    ['委托代理人', ysGetV('mm_p_agent') ? ysGetV('mm_p_agent') + '（' + ysGetV('mm_p_agentlv') + '）' : '无'],
+    ['被告（姓名/名称）', d],
+    ['住所地', ysGetV('mm_d_addr') || '——'],
+    ['诉讼请求'],
+    ['1. 主张金额', (claim || '——') + ' 元（人民币）'],
+    ['2. 利息/违约金', interest || '——'],
+    ['3. 是否要求解除合同', dissolve],
+    ['4. 其他费用', othercost || '无'],
+    ['事实与理由'],
+    ['1. 合同签订情况', ctname || '——'],
+    ['2. 标的物情况', goods || '——'],
+    ['3. 合同约定总价', (totalprice||'——') + ' 元；支付方式：' + payway],
+    ['4. 价款支付情况', '已付：' + (paid||'0') + '元；逾期未付：' + (unpaid||'0') + '元'],
+    ['5. 是否存在迟延履行', delay],
+    ['6. 是否催促履行', urge + '；' + (urgedesc || '')],
+    ['7. 请求依据', basis],
+  ]);
+  html += '<div class="ys-preview-signature">具状人：' + p + '<br>日期：　　年　　月　　日</div>';
+  html += ysCopyBtn('maimai') + '</div>';
+  return html;
+}
+
+function ysGenFangmaijie() {
+  var p = ysGetV('fmj_p_name'), d = ysGetV('fmj_d_name');
+  if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
+  var html = ysDocHeader('民事起诉状', '房屋买卖合同纠纷');
+  html += ysDocTable([['具状人（签字、盖章）：' + p + '　　日期：　　年　　月　　日']]);
+  html += '<br>';
+  html += ysDocTable([
+    ['当事人信息'],
+    ['原告', p + '　住所：' + (ysGetV('fmj_p_addr')||'——') + '　电话：' + (ysGetV('fmj_p_phone')||'——')],
+    ['被告', d + '　住所：' + (ysGetV('fmj_d_addr')||'——')],
+    ['诉讼请求'],
+    ['1. 合同关系处理', ysGetV('fmj_ctclaim')],
+    ['2. 购房款处理', ysGetV('fmj_payclaim') + '；金额：' + (ysGetV('fmj_money')||'——') + '元'],
+    ['3. 房屋交付/返还', ysGetV('fmj_houclaim')],
+    ['4. 办理不动产登记', ysGetV('fmj_regclaim')],
+    ['5. 是否主张诉讼费', ysGetV('fmj_suitfee')],
+    ['事实与理由'],
+    ['1. 合同订立时间', ysGetV('fmj_ctdate')||'——'],
+    ['2. 房屋性质', ysGetV('fmj_htype')],
+    ['3. 房屋坐落', ysGetV('fmj_hloc')||'——'],
+    ['4. 房屋面积', (ysGetV('fmj_harea')||'——') + '㎡'],
+    ['5. 合同总价', (ysGetV('fmj_totalprice')||'——') + '元；已付：' + (ysGetV('fmj_paid')||'——') + '元'],
+    ['6. 是否已交付房屋', ysGetV('fmj_delivered')],
+    ['7. 是否已办不动产登记', ysGetV('fmj_registered')],
+    ['8. 解除/撤销事由', ysGetV('fmj_dissolvereason')||'——'],
+    ['9. 请求依据', ysGetV('fmj_basis')],
+  ]);
+  html += '<div class="ys-preview-signature">具状人：' + p + '<br>日期：　　年　　月　　日</div>';
+  html += ysCopyBtn('fangmaijie') + '</div>';
+  return html;
+}
+
+function ysGenFangzu() {
+  var p = ysGetV('fz_p_name'), d = ysGetV('fz_d_name');
+  if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
+  var html = ysDocHeader('民事起诉状', '房屋租赁合同纠纷');
+  html += ysDocTable([['具状人（签字、盖章）：' + p + '　　日期：　　年　　月　　日']]);
+  html += '<br>';
+  html += ysDocTable([
+    ['当事人信息'],
+    ['原告（' + ysGetV('fz_role') + '）', p + '　住所：' + (ysGetV('fz_p_addr')||'——')],
+    ['被告', d + '　住所：' + (ysGetV('fz_d_addr')||'——')],
+    ['诉讼请求'],
+    ['1. 是否要求解除合同', ysGetV('fz_dissolve')],
+    ['2. 欠付租金（元）', (ysGetV('fz_rent')||'——')],
+    ['3. 押金（元）', (ysGetV('fz_deposit')||'——')],
+    ['4. 其他费用', ysGetV('fz_otherfee')||'无'],
+    ['事实与理由'],
+    ['1. 合同签订时间', ysGetV('fz_ctdate')||'——'],
+    ['2. 租赁房屋', ysGetV('fz_hloc')||'——'],
+    ['3. 月租金', (ysGetV('fz_rentmonth')||'——') + '元/月；租赁期：' + (ysGetV('fz_period')||'——')],
+    ['4. 欠付租金情况', '自' + (ysGetV('fz_owestart')||'——') + '至' + (ysGetV('fz_oweend')||'起诉之日') + '，欠付租金' + (ysGetV('fz_rent')||'——') + '元'],
+    ['5. 请求依据', ysGetV('fz_basis')],
+  ]);
+  html += '<div class="ys-preview-signature">具状人：' + p + '<br>日期：　　年　　月　　日</div>';
+  html += ysCopyBtn('fangzu') + '</div>';
+  return html;
+}
+
+function ysGenJinjie() {
+  var p = ysGetV('jj_p_name'), d = ysGetV('jj_d_name');
+  if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
+  var html = ysDocHeader('民事起诉状', '金融借款合同纠纷');
+  html += ysDocTable([['具状人（签字、盖章）：' + p + '　　日期：　　年　　月　　日']]);
+  html += '<br>';
+  html += ysDocTable([
+    ['当事人信息'],
+    ['原告（贷款方）', p + '　住所：' + (ysGetV('jj_p_addr')||'——')],
+    ['被告', d + '　住所：' + (ysGetV('jj_d_addr')||'——')],
+    ['诉讼请求'],
+    ['1. 本金（元）', (ysGetV('jj_principal')||'——') + '；截至：' + (ysGetV('jj_calcdate')||'——')],
+    ['2. 期内利息（元）', ysGetV('jj_interest')||'——'],
+    ['3. 罚息/违约金（元）', ysGetV('jj_penalty')||'——'],
+    ['4. 复利（元）', ysGetV('jj_compound')||'——'],
+    ['5. 是否主张担保权利', ysGetV('jj_guarantee') + '；' + (ysGetV('jj_guaranteecontent')||'')],
+    ['事实与理由'],
+    ['1. 合同签订情况', ysGetV('jj_ctname')||'——'],
+    ['2. 贷款人', p + '；借款人：' + d],
+    ['3. 借款金额', (ysGetV('jj_loanamount')||'——') + '元'],
+    ['4. 借款期限', ysGetV('jj_period')||'——'],
+    ['5. 约定利率', (ysGetV('jj_rate')||'——') + '%/年'],
+    ['6. 还款方式', ysGetV('jj_repayway')],
+    ['7. 已还本金', (ysGetV('jj_repaid')||'0') + '元'],
+    ['8. 担保情况', ysGetV('jj_security')||'无'],
+    ['9. 请求依据', ysGetV('jj_basis')],
+  ]);
+  html += '<div class="ys-preview-signature">具状人：' + p + '<br>日期：　　年　　月　　日</div>';
+  html += ysCopyBtn('jinjie') + '</div>';
+  return html;
+}
+
+function ysGenLaodong() {
+  var p = ysGetV('ld_p_name'), d = ysGetV('ld_d_name');
+  if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
+  var claimRows = [];
+  if (ysGetV('ld_wage') === '是') claimRows.push(['支付工资（元）', ysGetV('ld_wageval')||'——']);
+  if (ysGetV('ld_double') === '是') claimRows.push(['未签书面劳动合同双倍工资（元）', ysGetV('ld_doubleval')||'——']);
+  if (ysGetV('ld_overtime') === '是') claimRows.push(['加班费（元）', ysGetV('ld_overtimeval')||'——']);
+  if (ysGetV('ld_compensation') === '是') claimRows.push(['解除劳动合同经济补偿（元）', ysGetV('ld_compensationval')||'——']);
+  if (ysGetV('ld_damages') === '是') claimRows.push(['违法解除劳动合同赔偿金', '——']);
+  if (ysGetV('ld_other')) claimRows.push(['其他诉求', ysGetV('ld_other')]);
+
+  var html = ysDocHeader('民事起诉状', '劳动争议纠纷');
+  html += ysDocTable([['具状人（签字、盖章）：' + p + '　　日期：　　年　　月　　日']]);
+  html += '<br>';
+  var rows = [
+    ['当事人信息'],
+    ['原告（劳动者）', p + '　住所：' + (ysGetV('ld_p_addr')||'——') + '　电话：' + (ysGetV('ld_p_phone')||'——')],
+    ['委托代理人', ysGetV('ld_p_agent') ? ysGetV('ld_p_agent') + '（' + ysGetV('ld_p_agentlv') + '）' : '无'],
+    ['被告（用人单位）', d + '　住所：' + (ysGetV('ld_d_addr')||'——')],
+    ['诉讼请求'],
+  ];
+  claimRows.forEach(function(r, i) {
+    rows.push([(i+1) + '. ' + r[0], r[1]]);
+  });
+  rows = rows.concat([
+    ['事实与理由'],
+    ['1. 劳动合同签订情况', ysGetV('ld_hasct') === '是' ? '已签订书面劳动合同' : '未签订书面劳动合同'],
+    ['2. 劳动关系起止', (ysGetV('ld_startdate')||'——') + ' 至 ' + (ysGetV('ld_enddate')||'——')],
+    ['3. 工作岗位及工资', '岗位：' + (ysGetV('ld_position')||'——') + '；约定月工资：' + (ysGetV('ld_salary')||'——') + '元'],
+    ['4. 解除/终止原因', ysGetV('ld_endreason')||'——'],
+    ['5. 仲裁情况', ysGetV('ld_arbitration')||'——'],
+    ['6. 请求依据', ysGetV('ld_basis')],
+  ]);
+  html += ysDocTable(rows);
+  html += '<div class="ys-preview-signature">具状人：' + p + '<br>日期：　　年　　月　　日</div>';
+  html += ysCopyBtn('laodong') + '</div>';
+  return html;
+}
+
+function ysGenLihun() {
+  var p = ysGetV('lh_p_name'), d = ysGetV('lh_d_name');
+  if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
+  var html = ysDocHeader('民事起诉状', '离婚纠纷');
+  html += ysDocTable([['具状人（签字、盖章）：' + p + '　　日期：　　年　　月　　日']]);
+  html += '<br>';
+  html += ysDocTable([
+    ['当事人信息'],
+    ['原告', p + '　住所：' + (ysGetV('lh_p_addr')||'——') + '　电话：' + (ysGetV('lh_p_phone')||'——')],
+    ['委托代理人', ysGetV('lh_p_agent') ? ysGetV('lh_p_agent') + '（' + ysGetV('lh_p_agentlv') + '）' : '无'],
+    ['被告', d + '　住所：' + (ysGetV('lh_d_addr')||'——')],
+    ['诉讼请求'],
+    ['1. 解除婚姻关系', ysGetV('lh_divorceclaim')],
+    ['2. 夫妻共同财产处理', ysGetV('lh_property')||'无此问题'],
+    ['3. 夫妻共同债务处理', ysGetV('lh_debt')||'无此问题'],
+    ['4. 子女直接抚养', ysGetV('lh_child')||'无此问题'],
+    ['5. 子女抚养费', ysGetV('lh_childcost')||'无此问题'],
+    ['6. 探望权', ysGetV('lh_visit')||'无此问题'],
+    ['7. 离婚损害赔偿/补偿', ysGetV('lh_damages')||'无此问题'],
+    ['事实与理由'],
+    ['1. 婚姻关系基本情况', '结婚时间：' + (ysGetV('lh_marrdate')||'——') + '；子女：' + (ysGetV('lh_children')||'——')],
+    ['2. 离婚事由', ysGetV('lh_reason')||'——'],
+    ['3. 之前是否提起过离婚诉讼', ysGetV('lh_prev')],
+    ['4. 夫妻共同财产情况', ysGetV('lh_assets')||'——'],
+    ['5. 请求依据', ysGetV('lh_basis')],
+  ]);
+  html += '<div class="ys-preview-signature">具状人：' + p + '<br>日期：　　年　　月　　日</div>';
+  html += ysCopyBtn('lihun') + '</div>';
+  return html;
+}
+
+function ysGenJianshe() {
+  var p = ysGetV('js_p_name'), d = ysGetV('js_d_name');
+  if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
+  var html = ysDocHeader('民事起诉状', '建设工程施工合同纠纷');
+  html += ysDocTable([['具状人（签字、盖章）：' + p + '　　日期：　　年　　月　　日']]);
+  html += '<br>';
+  html += ysDocTable([
+    ['当事人信息'],
+    ['原告', p + '　住所：' + (ysGetV('js_p_addr')||'——')],
+    ['被告', d + '　住所：' + (ysGetV('js_d_addr')||'——')],
+    ['诉讼请求'],
+    ['1. 主张工程款（元）', ysGetV('js_claim')||'——'],
+    ['2. 利息/违约金', ysGetV('js_interest')||'——'],
+    ['3. 是否主张优先受偿权', ysGetV('js_priority')],
+    ['4. 其他费用', ysGetV('js_othercost')||'无'],
+    ['事实与理由'],
+    ['1. 合同签订情况', ysGetV('js_ctname')||'——'],
+    ['2. 工程名称及地点', ysGetV('js_projname')||'——'],
+    ['3. 合同价款', (ysGetV('js_totalprice')||'——') + '元'],
+    ['4. 承包方是否有资质', ysGetV('js_qualify')],
+    ['5. 竣工验收情况', ysGetV('js_accept')||'——'],
+    ['6. 已付工程款', (ysGetV('js_paid')||'——') + '元'],
+    ['7. 工程质量', ysGetV('js_quality')||'——'],
+    ['8. 请求依据', ysGetV('js_basis')],
+  ]);
+  html += '<div class="ys-preview-signature">具状人：' + p + '<br>日期：　　年　　月　　日</div>';
+  html += ysCopyBtn('jianshe') + '</div>';
+  return html;
+}
+
+function ysGenJidong() {
+  var p = ysGetV('jd_p_name'), d = ysGetV('jd_d_name');
+  if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
+  var items = [
+    ['医疗费', 'jd_medical'], ['误工费', 'jd_lostwork'], ['护理费', 'jd_nursing'],
+    ['残疾赔偿金', 'jd_disability'], ['死亡赔偿金', 'jd_death'], ['精神损害抚慰金', 'jd_spirit'],
+    ['交通费', 'jd_transport'], ['住院伙食补助', 'jd_food'], ['财产损失', 'jd_property'],
+  ];
+  var total = 0;
+  var claimRows = [];
+  items.forEach(function(item) {
+    var v = parseFloat(ysGetV(item[1])) || 0;
+    if (v > 0) {
+      claimRows.push([item[0] + '（元）', v.toLocaleString('zh-CN')]);
+      total += v;
+    }
+  });
+  if (ysGetV('jd_other')) claimRows.push(['其他赔偿', ysGetV('jd_other')]);
+
+  var html = ysDocHeader('民事起诉状', '机动车交通事故责任纠纷');
+  html += ysDocTable([['具状人（签字、盖章）：' + p + '　　日期：　　年　　月　　日']]);
+  html += '<br>';
+  var rows = [
+    ['当事人信息'],
+    ['原告（受害方）', p + '　住所：' + (ysGetV('jd_p_addr')||'——')],
+    ['被告', d + '　住所：' + (ysGetV('jd_d_addr')||'——')],
+    ['诉讼请求（赔偿项目）'],
+  ];
+  claimRows.forEach(function(r, i) { rows.push([(i+1) + '. ' + r[0], r[1]]); });
+  rows.push(['合计赔偿金额（元）', total.toLocaleString('zh-CN')]);
+  rows = rows.concat([
+    ['事实与理由'],
+    ['1. 事故发生时间', ysGetV('jd_accdate')||'——'],
+    ['2. 事故地点', ysGetV('jd_accloc')||'——'],
+    ['3. 责任认定', ysGetV('jd_liability')||'——'],
+    ['4. 伤残等级', ysGetV('jd_injurylevel')||'——'],
+    ['5. 保险公司', ysGetV('jd_insco')||'——'],
+    ['6. 保险赔付情况', ysGetV('jd_inspaid')||'——'],
+    ['7. 请求依据', ysGetV('jd_basis')],
+  ]);
+  html += ysDocTable(rows);
+  html += '<div class="ys-preview-signature">具状人：' + p + '<br>日期：　　年　　月　　日</div>';
+  html += ysCopyBtn('jidong') + '</div>';
+  return html;
+}
+
+function ysGenBuzh() {
+  var p = ysGetV('bz_p_name'), d = ysGetV('bz_d_name');
+  if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
+  var html = ysDocHeader('民事起诉状', '不正当竞争纠纷');
+  html += ysDocTable([['具状人（签字、盖章）：' + p + '　　日期：　　年　　月　　日']]);
+  html += '<br>';
+  html += ysDocTable([
+    ['当事人信息'],
+    ['原告', p + '　住所：' + (ysGetV('bz_p_addr')||'——')],
+    ['被告', d + '　住所：' + (ysGetV('bz_d_addr')||'——')],
+    ['诉讼请求'],
+    ['1. 侵权类型', ysGetV('bz_acttype')],
+    ['2. 是否要求停止侵权', ysGetV('bz_stop')],
+    ['3. 主张赔偿金额（元）', ysGetV('bz_damages')||'——'],
+    ['4. 是否要求消除影响/赔礼道歉', ysGetV('bz_apologize')],
+    ['5. 合理费用（元）', ysGetV('bz_costs')||'——'],
+    ['事实与理由'],
+    ['1. 不正当竞争行为', ysGetV('bz_actdesc')||'——'],
+    ['2. 损失情况', ysGetV('bz_loss')||'——'],
+    ['3. 请求依据', ysGetV('bz_basis')],
+  ]);
+  html += '<div class="ys-preview-signature">具状人：' + p + '<br>日期：　　年　　月　　日</div>';
+  html += ysCopyBtn('buzh') + '</div>';
+  return html;
+}
+
+function ysGenCaisun() {
+  var p = ysGetV('cs_p_name'), d = ysGetV('cs_d_name');
+  if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
+  var html = ysDocHeader('民事起诉状', '财产损失保险合同纠纷');
+  html += ysDocTable([['具状人（签字、盖章）：' + p + '　　日期：　　年　　月　　日']]);
+  html += '<br>';
+  html += ysDocTable([
+    ['当事人信息'],
+    ['原告（被保险人）', p + '　住所：' + (ysGetV('cs_p_addr')||'——')],
+    ['被告（保险公司）', d + '　住所：' + (ysGetV('cs_d_addr')||'——')],
+    ['诉讼请求'],
+    ['1. 主张保险赔偿金（元）', ysGetV('cs_claim')||'——'],
+    ['2. 是否主张利息', ysGetV('cs_interest')],
+    ['事实与理由'],
+    ['1. 保险单号', ysGetV('cs_policyno')||'——'],
+    ['2. 保险标的', ysGetV('cs_subject')||'——'],
+    ['3. 保险金额（元）', ysGetV('cs_suminsured')||'——'],
+    ['4. 保险期限', ysGetV('cs_period')||'——'],
+    ['5. 出险情况', ysGetV('cs_incident')||'——'],
+    ['6. 被告拒赔/少赔原因', ysGetV('cs_refusereason')||'——'],
+    ['7. 请求依据', ysGetV('cs_basis')],
+  ]);
+  html += '<div class="ys-preview-signature">具状人：' + p + '<br>日期：　　年　　月　　日</div>';
+  html += ysCopyBtn('caisun') + '</div>';
+  return html;
+}
+
+function ysGenBaozheng() {
+  var n = ysGetV('bzd_name');
+  if (!n) { alert('请填写答辩人名称！'); return ''; }
+  var html = ysDocHeader('民事答辩状', '保证保险合同纠纷');
+  html += ysDocTable([['答辩人（签字、盖章）：' + n + '　　日期：　　年　　月　　日']]);
+  html += '<br>';
+  html += ysDocTable([
+    ['答辩人信息'],
+    ['答辩人（被告）', n + '　住所：' + (ysGetV('bzd_addr')||'——') + '　电话：' + (ysGetV('bzd_phone')||'——')],
+    ['案件基本情况'],
+    ['保证保险合同情况', ysGetV('bzd_facts')||'——'],
+    ['答辩意见'],
+    ['理由一', ysGetV('bzd_r1')||'——'],
+    ['理由二', ysGetV('bzd_r2')||'——'],
+    ['理由三', ysGetV('bzd_r3')||'（无）'],
+    ['答辩结论', ysGetV('bzd_conclusion')],
+    ['请求依据', ysGetV('bzd_basis')],
+  ]);
+  html += '<div class="ys-preview-signature">答辩人：' + n + '<br>日期：　　年　　月　　日</div>';
+  html += ysCopyBtn('baozheng') + '</div>';
+  return html;
+}
+
+function ysGenZhixing() {
+  var p = ysGetV('zx_pname');
+  if (!p) { alert('请填写申请人姓名！'); return ''; }
+  var html = ysDocHeader('强制执行申请书', '', '致：人民法院执行局');
+  html += ysDocTable([
+    ['申请人信息'],
+    ['申请人', p + '　住所：' + (ysGetV('zx_paddr')||'——') + '　电话：' + (ysGetV('zx_pphone')||'——')],
+    ['被执行人信息'],
+    ['被执行人', ysGetV('zx_dname') + '　住所：' + (ysGetV('zx_daddr')||'——') + '　电话：' + (ysGetV('zx_dphone')||'——')],
+    ['执行依据'],
+    ['执行依据文书', ysGetV('zx_basis')||'——'],
+    ['判决/调解书生效时间', ysGetV('zx_effdate')||'——'],
+    ['申请执行内容'],
+    ['申请执行标的', ysGetV('zx_target')||'——'],
+    ['被执行人已知财产线索', ysGetV('zx_assets')||'申请人不知悉，请法院依职权查明'],
+  ]);
+  html += '<div class="ys-preview-signature">申请人：' + p + '<br>日期：　　年　　月　　日</div>';
+  html += ysCopyBtn('zhixing') + '</div>';
+  return html;
+}
+
+function ysGenYijian() {
+  var p = ysGetV('yj_pname');
+  if (!p) { alert('请填写申请人姓名！'); return ''; }
+  var html = ysDocHeader('执行异议申请书', '', '致：人民法院执行局');
+  html += ysDocTable([
+    ['申请人', p + '　住所：' + (ysGetV('yj_paddr')||'——') + '　电话：' + (ysGetV('yj_pphone')||'——')],
+    ['执行案号', ysGetV('yj_caseno')||'——'],
+    ['异议类型', ysGetV('yj_type')],
+    ['异议事实与理由'],
+    ['', ysGetV('yj_reason')||'——'],
+    ['申请请求'],
+    ['', ysGetV('yj_request')||'——'],
+    ['请求依据', ysGetV('yj_basis')],
+  ]);
+  html += '<div class="ys-preview-signature">申请人：' + p + '<br>日期：　　年　　月　　日</div>';
+  html += ysCopyBtn('yijian') + '</div>';
+  return html;
+}
+
+function ysGenFuyi() {
+  var p = ysGetV('fy_pname');
+  if (!p) { alert('请填写申请人姓名！'); return ''; }
+  var html = ysDocHeader('执行复议申请书', '', '致：上级人民法院');
+  html += ysDocTable([
+    ['申请人', p + '　住所：' + (ysGetV('fy_paddr')||'——') + '　电话：' + (ysGetV('fy_pphone')||'——')],
+    ['执行案号', ysGetV('fy_caseno')||'——'],
+    ['原裁定/决定作出法院', ysGetV('fy_court')||'——'],
+    ['被复议的具体裁定/措施', ysGetV('fy_subject')||'——'],
+    ['复议理由'],
+    ['', ysGetV('fy_reason')||'——'],
+    ['申请请求'],
+    ['', ysGetV('fy_request')||'——'],
+    ['请求依据', ysGetV('fy_basis')],
+  ]);
+  html += '<div class="ys-preview-signature">申请人：' + p + '<br>日期：　　年　　月　　日</div>';
+  html += ysCopyBtn('fuyi') + '</div>';
+  return html;
+}
+
+function ysGenCanyufenpei() {
+  var p = ysGetV('cy_pname');
+  if (!p) { alert('请填写申请人姓名！'); return ''; }
+  var html = ysDocHeader('参与（案款）分配申请书', '', '致：人民法院执行局');
+  html += ysDocTable([
+    ['申请人', p + '　住所：' + (ysGetV('cy_paddr')||'——') + '　电话：' + (ysGetV('cy_pphone')||'——')],
+    ['执行法院及案号', ysGetV('cy_caseno')||'——'],
+    ['被执行人', ysGetV('cy_debtor')||'——'],
+    ['申请人债权依据', ysGetV('cy_creditmain')||'——'],
+    ['债权金额（元）', ysGetV('cy_creditamt')||'——'],
+    ['参与分配理由'],
+    ['', ysGetV('cy_reason')||'——'],
+    ['请求依据', ysGetV('cy_basis')],
+  ]);
+  html += '<div class="ys-preview-signature">申请人：' + p + '<br>日期：　　年　　月　　日</div>';
+  html += ysCopyBtn('canyufenpei') + '</div>';
+  return html;
+}
+
+function ysCopyText(typeId) {
+  var el = document.getElementById('ysPreview_' + typeId);
+  if (!el) return;
+  // Extract plain text
+  var tmp = document.createElement('div');
+  tmp.innerHTML = el.querySelector('.ys-preview') ? el.querySelector('.ys-preview').innerHTML : el.innerHTML;
+  // Convert table to text
+  var tables = tmp.querySelectorAll('table');
+  tables.forEach(function(t) {
+    var rows = t.querySelectorAll('tr');
+    var lines = [];
+    rows.forEach(function(r) {
+      var cells = r.querySelectorAll('td');
+      if (cells.length === 1) {
+        lines.push('\n【' + cells[0].textContent.trim() + '】');
+      } else if (cells.length === 2) {
+        lines.push(cells[0].textContent.trim() + '：' + cells[1].textContent.trim());
+      }
+    });
+    var p = document.createElement('pre');
+    p.textContent = lines.join('\n');
+    t.parentNode.replaceChild(p, t);
+  });
+  var text = tmp.textContent || tmp.innerText || '';
+  navigator.clipboard.writeText(text).then(function() {
+    toast('文书内容已复制到剪贴板', 'success');
+  }).catch(function() {
+    // fallback
+    var ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast('文书内容已复制', 'success');
+  });
+}
+
+function ysPrint(typeId) {
+  var el = document.getElementById('ysPreview_' + typeId);
+  if (!el) return;
+  var content = el.innerHTML;
+  var win = window.open('', '', 'width=800,height=600');
+  win.document.write('<!DOCTYPE html><html><head><meta charset="UTF-8"><title>要素式诉状</title>');
+  win.document.write('<style>body{font-family:"SimSun","宋体",serif;padding:30px;font-size:14px;line-height:1.9;}');
+  win.document.write('h2{text-align:center;letter-spacing:3px;}');
+  win.document.write('table{width:100%;border-collapse:collapse;}');
+  win.document.write('td{padding:7px 12px;border:1px solid #ccc;vertical-align:top;}');
+  win.document.write('td:first-child{width:38%;background:#f8f6ee;font-weight:500;}');
+  win.document.write('.ys-preview-signature{text-align:right;margin-top:30px;}');
+  win.document.write('button{display:none!important;}');
+  win.document.write('</style></head><body>');
+  win.document.write(content);
+  win.document.write('</body></html>');
+  win.document.close();
+  win.focus();
+  setTimeout(function() { win.print(); }, 400);
+}
+
+  setTimeout(function() { win.print(); }, 400);
+}
+
+// ============ 智能解析传统诉状 ============
+
+// 切换输入标签（粘贴/上传）
+function ysSetParseTab(tab) {
+  ysState.parseTab = tab;
+  ysState.parseResult = null;
+  renderYaosushi();
+}
+
+// 处理文件上传
+function ysHandleFileUpload(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var text = e.target.result || '';
+    ysState.parseTab = 'text'; // 切回文本模式显示内容
+    renderYaosushi();
+    setTimeout(function() {
+      var ta = document.getElementById('ysParseInput');
+      if (ta) { ta.value = text; }
+    }, 50);
+    toast('文件读取成功，点击「立即识别」开始解析', 'success');
+  };
+  reader.readAsText(file, 'UTF-8');
+}
+
+// 启动解析
+function ysStartParse() {
+  var ta = document.getElementById('ysParseInput');
+  var text = ta ? ta.value.trim() : '';
+  if (!text) { toast('请先输入或粘贴诉状内容', 'warning'); return; }
+  var result = ysParseText(text);
+  ysState.parseResult = result;
+  if (result._identified === 0) {
+    toast('未能识别到有效内容，请确认文本格式是否为起诉状', 'warning');
+  } else {
+    toast('成功识别 ' + result._identified + ' 项要素！', 'success');
+  }
+  renderYaosushi();
+  // 滚动到识别结果
+  setTimeout(function() {
+    var el = document.querySelector('.ys-parse-result');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 100);
+}
+
+// ===== 核心解析函数 =====
+function ysParseText(text) {
+  var r = { _identified: 0, _typeId: null, _typeLabel: null };
+
+  // ===== 1. 识别案由 =====
+  var typeInfo = ysDetectCause(text);
+  r._typeId = typeInfo.id;
+  r._typeLabel = typeInfo.label;
+  if (typeInfo.id) r._identified++;
+
+  // ===== 2. 提取原告信息 =====
+  // 匹配 "原告：姓名，性别，..." 或 "原告姓名：..." 段落
+  var ptf = ysExtractParty(text, ['原告', '申请人', '上诉人', '出借方', '出借人', '卖方', '买方']);
+  if (ptf.name) { r.p_name = ptf.name; r._identified++; }
+  if (ptf.gender) r.p_gender = ptf.gender;
+  if (ptf.phone) { r.p_phone = ptf.phone; r._identified++; }
+  if (ptf.idno) r.p_idno = ptf.idno;
+  if (ptf.addr) { r.p_addr = ptf.addr; r._identified++; }
+
+  // ===== 3. 提取被告信息 =====
+  var def = ysExtractParty(text, ['被告', '被申请人', '被上诉人', '借款方', '借款人', '买方', '出卖方']);
+  if (def.name) { r.d_name = def.name; r._identified++; }
+  if (def.gender) r.d_gender = def.gender;
+  if (def.phone) { r.d_phone = def.phone; r._identified++; }
+  if (def.idno) r.d_idno = def.idno;
+  if (def.addr) { r.d_addr = def.addr; r._identified++; }
+
+  // ===== 4. 提取借款金额 =====
+  var amountMatch = text.match(/借款[金额本金]*[为是：:\s]*[人民币￥¥]?\s*([0-9,，]+(?:\.[0-9]+)?)\s*元/);
+  if (!amountMatch) amountMatch = text.match(/[金额本金][为是：:\s]*[人民币￥¥]?\s*([0-9,，]+(?:\.[0-9]+)?)\s*元/);
+  if (!amountMatch) amountMatch = text.match(/([0-9,，]+(?:\.[0-9]+)?)\s*元[整正]?\s*(?:人民币|RMB)?.*?(?:借|款|贷)/);
+  if (amountMatch) {
+    r.amount = amountMatch[1].replace(/,|，/g, '');
+    r._identified++;
+  }
+
+  // ===== 5. 提取利率 =====
+  var rateMatch = text.match(/(?:年利率|利率)[为是：:\s]*([0-9]+(?:\.[0-9]+)?)\s*%/);
+  if (!rateMatch) rateMatch = text.match(/([0-9]+(?:\.[0-9]+)?)\s*%\s*(?:的)?(?:年利率|月利率|利率)/);
+  if (rateMatch) { r.rate = rateMatch[1]; r._identified++; }
+
+  // ===== 6. 提取借款期限 =====
+  var periodMatch = text.match(/(?:借款期限|还款期限|借款期间|还款日期)[为是：:\s]*([\d零一二三四五六七八九十百]+年[\d零一二三四五六七八九十]+月[\d零一二三四五六七八九十]+日[至到—\-][\d零一二三四五六七八九十百]+年[\d零一二三四五六七八九十]+月[\d零一二三四五六七八九十]+日)/);
+  if (!periodMatch) periodMatch = text.match(/自?(2\d{3}年[0-9一二三四五六七八九十]+月[0-9一二三四五六七八九十]+日)[至到—\-](2\d{3}年[0-9一二三四五六七八九十]+月[0-9一二三四五六七八九十]+日)/);
+  if (periodMatch) {
+    r.period = periodMatch[1] + (periodMatch[2] ? '至' + periodMatch[2] : '');
+    r._identified++;
+  }
+
+  // ===== 7. 提取出借方式 =====
+  if (/转账|汇款|银行/.test(text)) r.payway = '转账';
+  else if (/现金/.test(text)) r.payway = '现金';
+
+  // ===== 8. 提取诉讼请求 =====
+  var claimsMatch = text.match(/(?:诉讼请求|请求事项|诉请)[：:\s\n]+([\s\S]{20,600}?)(?=事实与理由|事实理由|法律依据|此致|附|一、[^、])/);
+  if (claimsMatch) {
+    r.claims = claimsMatch[1].trim().slice(0, 300);
+    r._identified++;
+  }
+
+  // ===== 9. 提取代理律师 =====
+  var agentMatch = text.match(/委托(?:诉讼)?代理人[：:\s]*([^\s，,。\n]{2,15})/);
+  if (agentMatch) r.p_agent = agentMatch[1];
+
+  return r;
+}
+
+// 识别案由
+function ysDetectCause(text) {
+  var causeMap = [
+    { id: 'minjie', label: '民间借贷纠纷', keywords: ['民间借贷', '借款合同', '借款纠纷', '民间借贷纠纷', '借款本金', '出借', '借款人', '出借方'] },
+    { id: 'maimai', label: '买卖合同纠纷', keywords: ['买卖合同', '购销合同', '货款', '买卖', '产品质量', '售价', '卖方', '买方'] },
+    { id: 'fangmaijie', label: '房屋买卖合同纠纷', keywords: ['房屋买卖', '商品房', '购房', '房屋转让', '不动产', '房产'] },
+    { id: 'fangzu', label: '房屋租赁合同纠纷', keywords: ['房屋租赁', '租房', '租金', '承租', '房租', '租赁合同'] },
+    { id: 'jinjie', label: '金融借款合同纠纷', keywords: ['金融借款', '银行贷款', '信用贷款', '商业贷款', '按揭贷款'] },
+    { id: 'laodong', label: '劳动合同纠纷', keywords: ['劳动合同', '工资', '劳动报酬', '解除劳动', '劳动争议', '用人单位'] },
+    { id: 'lihun', label: '离婚纠纷', keywords: ['离婚', '夫妻', '婚姻', '子女抚养', '共同财产', '分割'] },
+    { id: 'jianshe', label: '建设工程合同纠纷', keywords: ['建设工程', '施工合同', '工程款', '承包', '发包', '建筑工程'] },
+    { id: 'jidong', label: '机动车交通事故责任纠纷', keywords: ['交通事故', '车辆', '机动车', '驾驶', '撞车', '交强险'] },
+    { id: 'caisun', label: '财产损害赔偿纠纷', keywords: ['财产损害', '赔偿', '损失', '侵权'] },
+    { id: 'lihun', label: '离婚纠纷', keywords: ['离婚'] }
+  ];
+  var scores = {};
+  causeMap.forEach(function(c) {
+    scores[c.id] = 0;
+    c.keywords.forEach(function(kw) { if (text.indexOf(kw) >= 0) scores[c.id] += 1; });
+  });
+  var best = null; var bestScore = 0;
+  causeMap.forEach(function(c) {
+    if (scores[c.id] > bestScore) { bestScore = scores[c.id]; best = c; }
+  });
+  return best && bestScore > 0 ? { id: best.id, label: best.label } : { id: null, label: null };
+}
+
+// 提取当事人信息（通用）
+function ysExtractParty(text, labels) {
+  var info = {};
+  // 找到第一个匹配标签的段落
+  var labelReg = new RegExp('(?:' + labels.join('|') + ')\\s*[：:、]\\s*([^\\n]{2,60})');
+  var m = text.match(labelReg);
+  if (!m) return info;
+  var line = m[1];
+
+  // 提取姓名（第一个词语，在逗号/，前）
+  var nameM = line.match(/^([^\s，,男女0-9]{2,10})/);
+  if (nameM) info.name = nameM[1].replace(/[，,。\s]$/, '');
+
+  // 性别
+  if (/男/.test(line.slice(0,20))) info.gender = '男';
+  else if (/女/.test(line.slice(0,20))) info.gender = '女';
+
+  // 电话（11位手机号）
+  var phoneM = text.slice(Math.max(0, text.indexOf(m[0]) - 20), text.indexOf(m[0]) + 200).match(/1[3-9]\d{9}/);
+  if (phoneM) info.phone = phoneM[0];
+
+  // 身份证号
+  var idM = line.match(/([1-9]\d{5}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dX])/i);
+  if (!idM) {
+    var context = text.slice(text.indexOf(m[0]), text.indexOf(m[0]) + 200);
+    idM = context.match(/([1-9]\d{5}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dX])/i);
+  }
+  if (idM) info.idno = idM[1];
+
+  // 地址（现住/住所地/住址）
+  var addrM = text.slice(text.indexOf(m[0]), text.indexOf(m[0]) + 300).match(/(?:现住|住所地|住址|住所|通讯地址)[：:\s]*([^\n，,。]{6,60})/);
+  if (!addrM) addrM = line.match(/(?:住|居住于|地址)[：:\s]*([^\n，,。]{5,50})/);
+  if (!addrM) {
+    // 从整个行里取地址性内容（省/市/区/路/号/村）
+    var addrCandM = line.match(/([^\s，,]{2,5}(?:省|市|区|县|镇|街|路|号|村|组)[^\s，,。]{2,40})/);
+    if (addrCandM) addrM = addrCandM;
+  }
+  if (addrM) info.addr = (addrM[1] || addrM[0]).trim();
+
+  return info;
+}
+
+// ===== 一键填入表单 =====
+function ysFillFormFromParse() {
+  var pr = ysState.parseResult;
+  if (!pr) return;
+
+  // 1. 自动选中对应案由
+  if (pr._typeId) {
+    ysState.selectedType = pr._typeId;
+  } else {
+    ysState.selectedType = 'minjie'; // 默认民间借贷
+  }
+  renderYaosushi();
+
+  // 2. 等DOM渲染完成后填入字段
+  setTimeout(function() {
+    var pfx = ysGetFormPrefix(ysState.selectedType);
+
+    // 填原告
+    if (pr.p_name) ysSetField(pfx + '_p_name', pr.p_name);
+    if (pr.p_gender) ysSetSelect(pfx + '_p_gender', pr.p_gender);
+    if (pr.p_phone) ysSetField(pfx + '_p_phone', pr.p_phone);
+    if (pr.p_idno) ysSetField(pfx + '_p_idno', pr.p_idno);
+    if (pr.p_addr) ysSetField(pfx + '_p_addr', pr.p_addr);
+    if (pr.p_agent) ysSetField(pfx + '_p_agent', pr.p_agent);
+
+    // 填被告
+    if (pr.d_name) ysSetField(pfx + '_d_name', pr.d_name);
+    if (pr.d_gender) ysSetSelect(pfx + '_d_gender', pr.d_gender);
+    if (pr.d_phone) ysSetField(pfx + '_d_phone', pr.d_phone);
+    if (pr.d_idno) ysSetField(pfx + '_d_idno', pr.d_idno);
+    if (pr.d_addr) ysSetField(pfx + '_d_addr', pr.d_addr);
+
+    // 填借贷相关字段（仅民间借贷）
+    if (ysState.selectedType === 'minjie') {
+      if (pr.amount) {
+        ysSetField('mj_principal', pr.amount);
+        ysSetField('mj_amount', pr.amount);
+        ysSetField('mj_actual', pr.amount);
+      }
+      if (pr.rate) ysSetField('mj_rate', pr.rate);
+      if (pr.period) ysSetField('mj_period', pr.period);
+      if (pr.payway) ysSetSelect('mj_payway', pr.payway);
+    }
+
+    // 填诉讼请求到other备注
+    if (pr.claims) {
+      var otherEl = document.getElementById(pfx + '_other');
+      if (!otherEl) otherEl = document.getElementById('mj_other');
+      if (otherEl && !otherEl.value) otherEl.value = '【诉讼请求原文】\n' + pr.claims;
+    }
+
+    // 滚动到表单
+    var formEl = document.getElementById('ysFormArea');
+    if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+    toast('✅ 已自动填入 ' + pr._identified + ' 项要素，请核对后生成文书', 'success');
+  }, 200);
+}
+
+// 工具：获取表单前缀
+function ysGetFormPrefix(typeId) {
+  var map = {
+    'minjie': 'mj', 'maimai': 'mm', 'fangmaijie': 'fmj', 'fangzu': 'fz',
+    'jinjie': 'jj', 'laodong': 'ld', 'lihun': 'lh', 'jianshe': 'js',
+    'jidong': 'jd', 'buzh': 'bz', 'caisun': 'cs', 'baozheng': 'bzh',
+    'zhixing': 'zx', 'yijian': 'yj', 'fuyi': 'fy', 'canyufenpei': 'cyfp'
+  };
+  return map[typeId] || 'mj';
+}
+
+// 工具：设置输入框
+function ysSetField(id, value) {
+  var el = document.getElementById(id);
+  if (el && !el.value) el.value = value;
+}
+
+// 工具：设置下拉框
+function ysSetSelect(id, value) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  for (var i = 0; i < el.options.length; i++) {
+    if (el.options[i].value === value || el.options[i].text === value) {
+      el.selectedIndex = i; return;
+    }
+  }
+}
+
+// ============ PAGE ROUTER (update to include new pages) ============
+var _origNavigateTo = typeof navigateTo === 'function' ? navigateTo : null;
+
+function navigateTo(page) {
+  var titles = {
+    dashboard: '仪表盘', schedule: '日程管理', todos: '待办事项',
+    cases: '案件管理', summary: '工作总结', reminders: '提醒中心',
+    tools: '工具箱', yaosushi: '要素式诉状生成器'
+  };
+  document.querySelectorAll('.nav-item').forEach(function(el) {
+    el.classList.toggle('active', el.dataset.page === page);
+  });
+  document.getElementById('pageTitle').textContent = titles[page] || page;
+  if (page === 'yaosushi') {
+    renderYaosushi();
+  } else if (page === 'dashboard') {
+    renderDashboard();
+  } else if (page === 'schedule') {
+    renderSchedule();
+  } else if (page === 'todos') {
+    renderTodos();
+  } else if (page === 'cases') {
+    renderCases();
+  } else if (page === 'summary') {
+    renderSummary();
+  } else if (page === 'reminders') {
+    renderReminders();
+  } else if (page === 'tools') {
+    renderTools();
+  }
+}
+
+</script>
+</body>
+</html>
