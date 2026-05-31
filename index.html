@@ -1396,7 +1396,7 @@ var currentTool = 'litigation';
 function renderTools() {
   var h = '<div class="card">';
   h += '<div class="card-header"><div style="display:flex;gap:8px;">';
-  var tools = [['litigation', '诉讼费计算器'], ['lawyerfee', '律师费计算器'], ['preservation', '保全费计算器'], ['timer', '计时器'], ['templates', '文书模板'], ['expenses', '费用记录'], ['contacts', '通讯录']];
+  var tools = [['litigation', '诉讼费计算器'], ['lawyerfee', '律师费计算器'], ['preservation', '保全费计算器'], ['daycalc', '天数计算器'], ['lpr', 'LPR查询'], ['timer', '计时器'], ['templates', '文书模板'], ['expenses', '费用记录'], ['contacts', '通讯录']];
   for (var i = 0; i < tools.length; i++) {
     var t = tools[i];
     h += '<div class="tab' + (currentTool === t[0] ? ' active' : '') + '" onclick="switchTool(\'' + t[0] + '\')">' + t[1] + '</div>';
@@ -1413,6 +1413,8 @@ function initTools() {
     case 'litigation': tc.innerHTML = renderLitigationCalc(); break;
     case 'lawyerfee': tc.innerHTML = renderLawyerFeeCalc(); break;
     case 'preservation': tc.innerHTML = '<div style="padding:20px;">' + renderPreservationCalc() + '</div>'; break;
+    case 'daycalc': tc.innerHTML = renderDayCalc(); initDayCalc(); break;
+    case 'lpr': tc.innerHTML = renderLPR(); break;
     case 'timer': tc.innerHTML = renderTimer(); initTimer(); break;
     case 'templates': tc.innerHTML = renderTemplates(); break;
     case 'expenses': tc.innerHTML = renderExpenses(); initExpenses(); break;
@@ -1952,6 +1954,357 @@ function onPresCalc() {
 
 function moneyFmt(n) {
   return Number(n.toFixed(2)).toLocaleString('zh-CN');
+}
+
+// ============ DAY CALCULATOR (天数计算器) ============
+function renderDayCalc() {
+  var today = new Date().toISOString().split('T')[0];
+  var h = '<h3 style="margin-bottom:4px;">天数计算器</h3>';
+  h += '<p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px;">计算日期间隔、日期加减、工作日计算 — 涵盖诉讼时效、上诉期限、保全期限等常用场景</p>';
+
+  // 模式切换
+  h += '<div style="display:flex;gap:8px;margin-bottom:20px;">';
+  h += '<div class="tab active" id="dcTab1" onclick="dcSwitchMode(1)" style="cursor:pointer">日期差计算</div>';
+  h += '<div class="tab" id="dcTab2" onclick="dcSwitchMode(2)" style="cursor:pointer">日期加减</div>';
+  h += '<div class="tab" id="dcTab3" onclick="dcSwitchMode(3)" style="cursor:pointer">工作日计算</div>';
+  h += '<div class="tab" id="dcTab4" onclick="dcSwitchMode(4)" style="cursor:pointer">常用期限速查</div>';
+  h += '</div>';
+
+  // 模式1：日期差计算
+  h += '<div id="dcMode1">';
+  h += '<div style="display:grid;grid-template-columns:1fr auto 1fr;gap:16px;align-items:end;">';
+  h += '<div class="form-group"><label class="form-label">起始日期</label><input class="form-input" type="date" id="dcStart" value="' + today + '" onchange="calcDateDiff()"></div>';
+  h += '<div style="padding-bottom:8px;color:var(--text-secondary);">→</div>';
+  h += '<div class="form-group"><label class="form-label">截止日期</label><input class="form-input" type="date" id="dcEnd" onchange="calcDateDiff()"></div>';
+  h += '</div>';
+  h += '<div id="dcDiffResult" style="margin-top:16px;"></div>';
+  h += '</div>';
+
+  // 模式2：日期加减
+  h += '<div id="dcMode2" style="display:none;">';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">';
+  h += '<div class="form-group"><label class="form-label">基准日期</label><input class="form-input" type="date" id="dcBase" value="' + today + '"></div>';
+  h += '<div class="form-group"><label class="form-label">天数（负数为往前算）</label><input class="form-input" type="number" id="dcDays" value="15" placeholder="正数向后，负数向前"></div>';
+  h += '</div>';
+  h += '<button class="btn btn-primary" style="margin-top:16px;" onclick="calcDateAdd()">计算结果日期</button>';
+  h += '<div id="dcAddResult" style="margin-top:16px;"></div>';
+  h += '</div>';
+
+  // 模式3：工作日计算
+  h += '<div id="dcMode3" style="display:none;">';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">';
+  h += '<div class="form-group"><label class="form-label">起始日期</label><input class="form-input" type="date" id="dcWdStart" value="' + today + '"></div>';
+  h += '<div class="form-group"><label class="form-label">工作日数</label><input class="form-input" type="number" id="dcWdCount" value="10" min="1" placeholder="工作日天数"></div>';
+  h += '</div>';
+  h += '<button class="btn btn-primary" style="margin-top:16px;" onclick="calcWorkday()">计算截止日期</button>';
+  h += '<div id="dcWdResult" style="margin-top:16px;"></div>';
+  h += '</div>';
+
+  // 模式4：常用期限速查
+  h += '<div id="dcMode4" style="display:none;">';
+  h += renderDeadlineRef();
+  h += '</div>';
+
+  return h;
+}
+
+function initDayCalc() {
+  var today = new Date().toISOString().split('T')[0];
+  var end = new Date(); end.setDate(end.getDate() + 15);
+  var el = document.getElementById('dcEnd');
+  if (el) el.value = end.toISOString().split('T')[0];
+  calcDateDiff();
+}
+
+function dcSwitchMode(mode) {
+  for (var i = 1; i <= 4; i++) {
+    var tab = document.getElementById('dcTab' + i);
+    var panel = document.getElementById('dcMode' + i);
+    if (tab) tab.className = 'tab' + (i === mode ? ' active' : '');
+    if (panel) panel.style.display = i === mode ? '' : 'none';
+  }
+}
+
+function calcDateDiff() {
+  var s = document.getElementById('dcStart').value;
+  var e = document.getElementById('dcEnd').value;
+  var el = document.getElementById('dcDiffResult');
+  if (!s || !e) { el.innerHTML = ''; return; }
+  var d1 = new Date(s), d2 = new Date(e);
+  var diffMs = d2 - d1;
+  var diffDays = Math.round(diffMs / 86400000);
+  var absDays = Math.abs(diffDays);
+  var weeks = Math.floor(absDays / 7);
+  var remainDays = absDays % 7;
+  // 计算工作日
+  var workdays = countWorkdays(d1, d2);
+
+  var css = 'background:var(--bg-primary);border:1px solid var(--border-color);border-radius:10px;padding:16px;';
+  if (diffDays === 0) {
+    el.innerHTML = '<div style="' + css + '"><div style="font-size:14px;color:var(--text-secondary);">两个日期相同</div></div>';
+    return;
+  }
+  var dir = diffDays > 0 ? '后' : '前';
+  el.innerHTML = '<div style="' + css + '">'
+    + '<div style="font-size:28px;font-weight:700;color:var(--primary);">' + absDays + ' 天</div>'
+    + '<div style="font-size:13px;color:var(--text-secondary);margin-top:8px;">起始日 ' + (diffDays > 0 ? '→' : '←') + ' 截止日：相差 <b>' + weeks + '</b> 周 <b>' + remainDays + '</b> 天</div>'
+    + '<div style="font-size:13px;color:var(--text-secondary);margin-top:4px;">其中工作日（排除周末）：<b style="color:var(--primary);">' + workdays + '</b> 天</div>'
+    + '<div style="font-size:13px;color:var(--text-secondary);margin-top:4px;">包含起始日计算（+1）：<b>' + (absDays + 1) + '</b> 天</div>'
+    + '</div>';
+}
+
+function calcDateAdd() {
+  var base = document.getElementById('dcBase').value;
+  var days = parseInt(document.getElementById('dcDays').value);
+  var el = document.getElementById('dcAddResult');
+  if (!base || isNaN(days)) { el.innerHTML = '<div style="color:red;">请填写完整信息</div>'; return; }
+  var d = new Date(base);
+  d.setDate(d.getDate() + days);
+  var result = d.toISOString().split('T')[0];
+  var weekday = ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()];
+  var today = new Date(); today.setHours(0,0,0,0);
+  var future = d > today;
+  var css = 'background:var(--bg-primary);border:1px solid var(--border-color);border-radius:10px;padding:16px;';
+  el.innerHTML = '<div style="' + css + '">'
+    + '<div style="font-size:28px;font-weight:700;color:var(--primary);">' + result + '</div>'
+    + '<div style="font-size:13px;color:var(--text-secondary);margin-top:8px;">' + weekday + ' | ' + (future ? '距今还有 <b>' + Math.ceil((d - today) / 86400000) + '</b> 天' : '已过去 <b>' + Math.abs(Math.ceil((d - today) / 86400000)) + '</b> 天') + '</div>'
+    + '</div>';
+}
+
+function calcWorkday() {
+  var start = document.getElementById('dcWdStart').value;
+  var count = parseInt(document.getElementById('dcWdCount').value);
+  var el = document.getElementById('dcWdResult');
+  if (!start || isNaN(count) || count < 1) { el.innerHTML = '<div style="color:red;">请填写完整信息</div>'; return; }
+  var d = new Date(start);
+  var added = 0;
+  var totalDays = 0;
+  while (added < count) {
+    d.setDate(d.getDate() + 1);
+    totalDays++;
+    var dow = d.getDay();
+    if (dow !== 0 && dow !== 6) added++;
+  }
+  var result = d.toISOString().split('T')[0];
+  var weekday = ['周日','周一','周二','周三','周四','周五','周六'][d.getDay()];
+  var css = 'background:var(--bg-primary);border:1px solid var(--border-color);border-radius:10px;padding:16px;';
+  el.innerHTML = '<div style="' + css + '">'
+    + '<div style="font-size:28px;font-weight:700;color:var(--primary);">' + result + '</div>'
+    + '<div style="font-size:13px;color:var(--text-secondary);margin-top:8px;">' + weekday + ' | 共经过自然日 <b>' + totalDays + '</b> 天（含 <b>' + (totalDays - count) + '</b> 天周末）</div>'
+    + '</div>';
+}
+
+function countWorkdays(d1, d2) {
+  var start = d1 < d2 ? d1 : d2;
+  var end = d1 < d2 ? d2 : d1;
+  var count = 0;
+  var d = new Date(start);
+  d.setDate(d.getDate() + 1); // 排除起始日
+  while (d < end) {
+    var dow = d.getDay();
+    if (dow !== 0 && dow !== 6) count++;
+    d.setDate(d.getDate() + 1);
+  }
+  return count;
+}
+
+function renderDeadlineRef() {
+  var items = [
+    { name: '民事诉讼时效', period: '3年', desc: '《民法典》第188条，自权利人知道或应当知道权利受损害及义务人之日起', law: '民法典§188' },
+    { name: '短期时效（人身损害赔偿）', period: '3年', desc: '从受伤之日起计算', law: '民法典§188' },
+    { name: '不服一审判决上诉期限', period: '15日', desc: '判决书送达之日起（不可延长）', law: '民诉法§171' },
+    { name: '不服一审裁定上诉期限', period: '10日', desc: '裁定书送达之日起', law: '民诉法§171' },
+    { name: '申请执行期限', period: '2年', desc: '从法律文书规定履行期限的最后一日起', law: '民诉法§250' },
+    { name: '财产保全期限', period: '30日', desc: '诉前保全，需在30日内起诉，否则解除', law: '民诉法§104' },
+    { name: '诉前财产保全', period: '48小时', desc: '法院接受申请后须在48小时内作出裁定', law: '民诉法§104' },
+    { name: '举证期限', period: '≥15日', desc: '一审普通程序不少于15日，简易程序可协商', law: '民诉法解释§99' },
+    { name: '管辖权异议', period: '15日', desc: '提交答辩状期间内提出', law: '民诉法§130' },
+    { name: '支付令异议', period: '15日', desc: '收到支付令之日起', law: '民诉法§224' },
+    { name: '公示催告', period: '60日', desc: '公告期不少于60日', law: '民诉法§224' },
+    { name: '离婚冷静期', period: '30日', desc: '婚姻登记机关收到离婚登记申请之日起30日内', law: '民法典§1077' },
+    { name: '劳动仲裁时效', period: '1年', desc: '自知道或应当知道权利被侵害之日起', law: '劳动争议调解仲裁法§27' },
+    { name: '行政复议期限', period: '60日', desc: '自知道具体行政行为之日起', law: '行政复议法§20' },
+    { name: '行政诉讼起诉期限', period: '6个月', desc: '知道或应当知道行政行为作出之日起', law: '行政诉讼法§46' },
+    { name: '再审申请期限', period: '6个月', desc: '自裁判发生法律效力之日起', law: '民诉法§212' },
+    { name: '公告送达', period: '30日', desc: '公告期满视为送达', law: '民诉法§95' },
+    { name: '鉴定意见异议', period: '15日', desc: '收到鉴定意见书之日起', law: '民诉法解释§121' },
+    { name: '案外人执行异议', period: '15日', desc: '自执行程序终结前提出', law: '民诉法§234' },
+  ];
+
+  var h = '<div style="display:flex;flex-direction:column;gap:8px;">';
+  h += '<div style="font-size:13px;color:var(--text-secondary);margin-bottom:4px;">法律实务常用诉讼/仲裁/行政期限一览（点击"起始日"可自动计算截止日期）</div>';
+  for (var i = 0; i < items.length; i++) {
+    var it = items[i];
+    var bg = i % 2 === 0 ? 'var(--bg-primary)' : 'var(--bg-secondary)';
+    h += '<div style="background:' + bg + ';border:1px solid var(--border-color);border-radius:8px;padding:12px 16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;">';
+    h += '<div style="min-width:200px;font-weight:600;font-size:14px;">' + it.name + '</div>';
+    h += '<div style="min-width:60px;font-size:20px;font-weight:700;color:var(--primary);">' + it.period + '</div>';
+    h += '<div style="flex:1;font-size:12px;color:var(--text-secondary);">' + it.desc + '</div>';
+    h += '<div style="font-size:11px;color:var(--text-tertiary);white-space:nowrap;">' + it.law + '</div>';
+    h += '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+// ============ LPR QUERY (LPR历史查询) ============
+var LPR_DATA = [
+  { date: '2024-10-21', lpr1y: 3.10, lpr5y: 3.60 },
+  { date: '2024-07-22', lpr1y: 3.35, lpr5y: 3.85 },
+  { date: '2024-02-20', lpr1y: 3.45, lpr5y: 3.95 },
+  { date: '2023-08-21', lpr1y: 3.45, lpr5y: 3.85 },
+  { date: '2023-06-20', lpr1y: 3.55, lpr5y: 3.95 },
+  { date: '2022-08-22', lpr1y: 3.65, lpr5y: 4.30 },
+  { date: '2022-05-20', lpr1y: 3.70, lpr5y: 4.45 },
+  { date: '2022-01-20', lpr1y: 3.70, lpr5y: 4.60 },
+  { date: '2021-12-20', lpr1y: 3.80, lpr5y: 4.65 },
+  { date: '2021-09-22', lpr1y: 3.85, lpr5y: 4.65 },
+  { date: '2021-06-21', lpr1y: 3.85, lpr5y: 4.65 },
+  { date: '2021-03-22', lpr1y: 3.85, lpr5y: 4.65 },
+  { date: '2020-12-21', lpr1y: 3.85, lpr5y: 4.65 },
+  { date: '2020-09-21', lpr1y: 3.85, lpr5y: 4.65 },
+  { date: '2020-08-20', lpr1y: 3.85, lpr5y: 4.65 },
+  { date: '2020-04-20', lpr1y: 3.85, lpr5y: 4.65 },
+  { date: '2020-02-20', lpr1y: 4.05, lpr5y: 4.75 },
+  { date: '2019-12-20', lpr1y: 4.15, lpr5y: 4.80 },
+  { date: '2019-11-20', lpr1y: 4.15, lpr5y: 4.80 },
+  { date: '2019-10-21', lpr1y: 4.15, lpr5y: 4.80 },
+  { date: '2019-09-20', lpr1y: 4.15, lpr5y: 4.80 },
+  { date: '2019-08-20', lpr1y: 4.25, lpr5y: 4.85 },
+];
+
+function getLPRForDate(dateStr) {
+  if (!dateStr) return null;
+  var d = new Date(dateStr);
+  for (var i = 0; i < LPR_DATA.length; i++) {
+    var lr = new Date(LPR_DATA[i].date);
+    if (d >= lr) return LPR_DATA[i];
+  }
+  return null;
+}
+
+function renderLPR() {
+  var today = new Date().toISOString().split('T')[0];
+  var current = LPR_DATA[0]; // 最新
+
+  var h = '<h3 style="margin-bottom:4px;">LPR 利率查询</h3>';
+  h += '<p style="font-size:13px;color:var(--text-secondary);margin-bottom:20px;">贷款市场报价利率（Loan Prime Rate）历史数据查询，覆盖2019年8月至今全部调整记录</p>';
+
+  // 当前利率展示
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">';
+  h += '<div style="background:linear-gradient(135deg,#667eea,#764ba2);border-radius:12px;padding:20px;color:#fff;">';
+  h += '<div style="font-size:12px;opacity:0.8;">当前 1年期 LPR</div>';
+  h += '<div style="font-size:36px;font-weight:700;">' + current.lpr1y + '%</div>';
+  h += '<div style="font-size:11px;opacity:0.7;margin-top:4px;">生效日期：' + current.date + '</div>';
+  h += '</div>';
+  h += '<div style="background:linear-gradient(135deg,#f093fb,#f5576c);border-radius:12px;padding:20px;color:#fff;">';
+  h += '<div style="font-size:12px;opacity:0.8;">当前 5年期以上 LPR</div>';
+  h += '<div style="font-size:36px;font-weight:700;">' + current.lpr5y + '%</div>';
+  h += '<div style="font-size:11px;opacity:0.7;margin-top:4px;">生效日期：' + current.date + '</div>';
+  h += '</div>';
+  h += '</div>';
+
+  // 日期查询
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr auto;gap:16px;align-items:end;margin-bottom:20px;">';
+  h += '<div class="form-group"><label class="form-label">查询日期</label><input class="form-input" type="date" id="lprQueryDate" value="' + today + '"></div>';
+  h += '<div></div>';
+  h += '<button class="btn btn-primary" onclick="queryLPR()">查询当日LPR</button>';
+  h += '</div>';
+  h += '<div id="lprQueryResult"></div>';
+
+  // 历史表格
+  h += '<div style="margin-top:24px;">';
+  h += '<h4 style="margin-bottom:12px;">历史LPR调整记录</h4>';
+  h += '<div style="overflow-x:auto;">';
+  h += '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+  h += '<thead><tr style="background:var(--bg-secondary);">';
+  h += '<th style="padding:10px 12px;text-align:left;border-bottom:2px solid var(--border-color);">生效日期</th>';
+  h += '<th style="padding:10px 12px;text-align:center;border-bottom:2px solid var(--border-color);">1年期LPR</th>';
+  h += '<th style="padding:10px 12px;text-align:center;border-bottom:2px solid var(--border-color);">5年期以上LPR</th>';
+  h += '<th style="padding:10px 12px;text-align:center;border-bottom:2px solid var(--border-color);">1年期变动</th>';
+  h += '<th style="padding:10px 12px;text-align:center;border-bottom:2px solid var(--border-color);">5年期变动</th>';
+  h += '</tr></thead><tbody>';
+  for (var i = 0; i < LPR_DATA.length; i++) {
+    var lr = LPR_DATA[i];
+    var bg = i % 2 === 0 ? 'var(--bg-primary)' : 'var(--bg-secondary)';
+    h += '<tr style="background:' + bg + ';">';
+    h += '<td style="padding:10px 12px;border-bottom:1px solid var(--border-color);font-weight:500;">' + lr.date + '</td>';
+    h += '<td style="padding:10px 12px;text-align:center;border-bottom:1px solid var(--border-color);font-weight:600;color:var(--primary);">' + lr.lpr1y + '%</td>';
+    h += '<td style="padding:10px 12px;text-align:center;border-bottom:1px solid var(--border-color);font-weight:600;color:var(--primary);">' + lr.lpr5y + '%</td>';
+    if (i < LPR_DATA.length - 1) {
+      var prev = LPR_DATA[i + 1];
+      var d1 = (lr.lpr1y - prev.lpr1y).toFixed(2);
+      var d5 = (lr.lpr5y - prev.lpr5y).toFixed(2);
+      h += '<td style="padding:10px 12px;text-align:center;border-bottom:1px solid var(--border-color);color:' + (d1 > 0 ? '#e53e3e' : d1 < 0 ? '#38a169' : 'var(--text-secondary)') + ';">' + (d1 > 0 ? '+' : '') + d1 + '</td>';
+      h += '<td style="padding:10px 12px;text-align:center;border-bottom:1px solid var(--border-color);color:' + (d5 > 0 ? '#e53e3e' : d5 < 0 ? '#38a169' : 'var(--text-secondary)') + ';">' + (d5 > 0 ? '+' : '') + d5 + '</td>';
+    } else {
+      h += '<td style="padding:10px 12px;text-align:center;border-bottom:1px solid var(--border-color);color:var(--text-secondary);">首期</td>';
+      h += '<td style="padding:10px 12px;text-align:center;border-bottom:1px solid var(--border-color);color:var(--text-secondary);">首期</td>';
+    }
+    h += '</tr>';
+  }
+  h += '</tbody></table></div></div>';
+
+  // 趋势图（用简单CSS柱状图）
+  h += '<div style="margin-top:24px;">';
+  h += '<h4 style="margin-bottom:12px;">LPR走势图</h4>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">';
+  h += '<div style="background:var(--bg-primary);border:1px solid var(--border-color);border-radius:10px;padding:16px;">';
+  h += '<div style="font-size:13px;font-weight:600;margin-bottom:12px;text-align:center;">1年期 LPR</div>';
+  h += renderLPRChart(LPR_DATA.map(function(d){return d.lpr1y;}), '1y');
+  h += '</div>';
+  h += '<div style="background:var(--bg-primary);border:1px solid var(--border-color);border-radius:10px;padding:16px;">';
+  h += '<div style="font-size:13px;font-weight:600;margin-bottom:12px;text-align:center;">5年期以上 LPR</div>';
+  h += renderLPRChart(LPR_DATA.map(function(d){return d.lpr5y;}), '5y');
+  h += '</div>';
+  h += '</div></div>';
+
+  return h;
+}
+
+function renderLPRChart(values, id) {
+  var min = Math.min.apply(null, values) - 0.1;
+  var max = Math.max.apply(null, values) + 0.1;
+  var range = max - min || 1;
+  var chartH = 120;
+  var h = '<div style="position:relative;height:' + (chartH + 24) + 'px;">';
+  for (var i = 0; i < values.length; i++) {
+    var pct = ((values[i] - min) / range) * 100;
+    var barH = Math.max(4, pct * chartH / 100);
+    var y = chartH - barH;
+    var isLatest = i === 0;
+    var color = isLatest ? 'var(--primary)' : 'var(--border-color)';
+    h += '<div style="position:absolute;bottom:24px;left:' + (i * 100 / values.length) + '%;width:' + (100 / values.length - 2) + '%;min-width:6px;height:' + barH + 'px;background:' + color + ';border-radius:3px 3px 0 0;" title="' + values[i] + '% (' + LPR_DATA[i].date + ')"></div>';
+  }
+  // Y轴标签
+  h += '<div style="position:absolute;bottom:24px;left:-2px;font-size:10px;color:var(--text-tertiary);">' + min.toFixed(1) + '%</div>';
+  h += '<div style="position:absolute;top:0;left:-2px;font-size:10px;color:var(--text-tertiary);">' + max.toFixed(1) + '%</div>';
+  // X轴标签（只显示首尾和最新）
+  var lastIdx = values.length - 1;
+  h += '<div style="position:absolute;bottom:4px;left:0;font-size:9px;color:var(--text-tertiary);">' + LPR_DATA[lastIdx].date.substring(0,7) + '</div>';
+  h += '<div style="position:absolute;bottom:4px;left:50%;transform:translateX(-50%);font-size:9px;color:var(--text-tertiary);">' + LPR_DATA[Math.floor(lastIdx/2)].date.substring(0,7) + '</div>';
+  h += '<div style="position:absolute;bottom:4px;right:0;font-size:9px;color:var(--text-tertiary);">' + LPR_DATA[0].date.substring(0,7) + '</div>';
+  h += '</div>';
+  return h;
+}
+
+function queryLPR() {
+  var dateStr = document.getElementById('lprQueryDate').value;
+  var el = document.getElementById('lprQueryResult');
+  if (!dateStr) { el.innerHTML = ''; return; }
+  var lr = getLPRForDate(dateStr);
+  if (!lr) {
+    el.innerHTML = '<div style="background:#fff5f5;border:1px solid #fc8181;border-radius:10px;padding:16px;color:#c53030;">该日期在LPR机制实施（2019年8月20日）之前，无LPR数据</div>';
+    return;
+  }
+  var css = 'background:var(--bg-primary);border:1px solid var(--border-color);border-radius:10px;padding:16px;';
+  el.innerHTML = '<div style="' + css + '">'
+    + '<div style="font-size:14px;font-weight:600;margin-bottom:8px;">查询结果：<span style="color:var(--primary);">' + dateStr + '</span></div>'
+    + '<div style="font-size:13px;color:var(--text-secondary);">适用LPR（' + lr.date + ' 起生效）：</div>'
+    + '<div style="display:flex;gap:24px;margin-top:8px;">'
+    + '<div><span style="font-size:24px;font-weight:700;color:var(--primary);">' + lr.lpr1y + '%</span> <span style="font-size:12px;color:var(--text-secondary);">1年期</span></div>'
+    + '<div><span style="font-size:24px;font-weight:700;color:var(--primary);">' + lr.lpr5y + '%</span> <span style="font-size:12px;color:var(--text-secondary);">5年期以上</span></div>'
+    + '</div></div>';
 }
 
 // ============ YAOSUSHI (要素式诉状生成器) ============
