@@ -4661,7 +4661,7 @@ function ysParseText(text) {
   if (def.idno) r.d_idno = def.idno;
   if (def.addr) { r.d_addr = def.addr; r._identified++; }
   if (def.birth) r.d_birth = def.birth;
-  if (def.orgType) r.d_orgType = def.d_orgType;
+  if (def.orgType) r.d_orgType = def.orgType;
 
   // ===== 4. 提取借款金额 =====
   var amountPatterns = [
@@ -4891,39 +4891,71 @@ function ysFillFormFromParse() {
     var pfx = ysGetFormPrefix(ysState.selectedType);
     var filledCount = 0;
 
+    // 判断是否使用多人表单（目前只有jidong使用ysMultiPartySection）
+    var useMultiParty = (ysState.selectedType === 'jidong');
+    // 原告/被告字段前缀：多人表单带索引0，单人表单不带
+    var pIdBase = useMultiParty ? pfx + '_p0' : pfx + '_p';
+    var dIdBase = useMultiParty ? pfx + '_d0' : pfx + '_d';
+
+    // 辅助：设置radio选中并触发切换
+    function setRadioAndToggle(name, value, toggleFn) {
+      var radios = document.getElementsByName(name);
+      for (var i = 0; i < radios.length; i++) {
+        if (radios[i].value === value) {
+          radios[i].checked = true;
+          if (toggleFn) toggleFn();
+          break;
+        }
+      }
+    }
+
     // 填原告（根据识别到的当事人类型）
     if (pr.p_orgType === '法人') {
       // 法人当事人
-      ysSetField(pfx + '_p_org_name', pr.p_name);
-      ysSetField(pfx + '_p_org_addr', pr.p_addr);
-      ysSetField(pfx + '_p_org_phone', pr.p_phone);
+      ysSetField(pIdBase + '_org_name', pr.p_name);
+      ysSetField(pIdBase + '_org_addr', pr.p_addr);
+      ysSetField(pIdBase + '_org_phone', pr.p_phone);
       // 切换到法人显示
-      ysTogglePartyType(pfx + '_p', '法人');
+      if (useMultiParty) {
+        setRadioAndToggle(pIdBase + '_type', '法人', function() { ysTogglePartyType(pIdBase, '法人'); });
+      } else {
+        ysTogglePartyType(pfx + '_p', '法人');
+      }
     } else {
       // 自然人当事人
-      if (pr.p_name) { ysSetField(pfx + '_p_name', pr.p_name); filledCount++; }
-      if (pr.p_gender) ysSetSelect(pfx + '_p_gender', pr.p_gender);
-      if (pr.p_phone) { ysSetField(pfx + '_p_phone', pr.p_phone); filledCount++; }
-      if (pr.p_idno) ysSetField(pfx + '_p_idno', pr.p_idno);
-      if (pr.p_addr) { ysSetField(pfx + '_p_addr', pr.p_addr); filledCount++; }
-      if (pr.p_birth) ysSetField(pfx + '_p_birth', pr.p_birth);
-      if (pr.p_ethnic) ysSetField(pfx + '_p_ethnic', pr.p_ethnic);
-      if (pr.p_workunit) ysSetField(pfx + '_p_workunit', pr.p_workunit);
+      if (pr.p_name) { ysSetField(pIdBase + '_name', pr.p_name); filledCount++; }
+      if (pr.p_gender) ysSetSelect(pIdBase + '_gender', pr.p_gender);
+      if (pr.p_phone) { ysSetField(pIdBase + '_phone', pr.p_phone); filledCount++; }
+      if (pr.p_idno) ysSetField(pIdBase + '_idno', pr.p_idno);
+      if (pr.p_addr) { ysSetField(pIdBase + '_addr', pr.p_addr); filledCount++; }
+      if (pr.p_birth) ysSetField(pIdBase + '_birth', pr.p_birth);
+      if (pr.p_ethnic) ysSetField(pIdBase + '_ethnic', pr.p_ethnic);
+      if (pr.p_workunit) ysSetField(pIdBase + '_workunit', pr.p_workunit);
     }
-    if (pr.p_agent) { ysSetField(pfx + '_p_agent', pr.p_agent); filledCount++; }
+    if (pr.p_agent) {
+      ysSetField(pIdBase + '_agent', pr.p_agent);
+      if (useMultiParty) {
+        setRadioAndToggle(pIdBase + '_agent_has', '有', function() { ysToggleAgent(pIdBase, true); });
+      }
+      filledCount++;
+    }
 
     // 填被告
     if (pr.d_orgType === '法人') {
-      ysSetField(pfx + '_d_org_name', pr.d_name);
-      ysSetField(pfx + '_d_org_addr', pr.d_addr);
-      ysSetField(pfx + '_d_org_phone', pr.d_phone);
-      ysTogglePartyType(pfx + '_d', '法人');
+      ysSetField(dIdBase + '_org_name', pr.d_name);
+      ysSetField(dIdBase + '_org_addr', pr.d_addr);
+      ysSetField(dIdBase + '_org_phone', pr.d_phone);
+      if (useMultiParty) {
+        setRadioAndToggle(dIdBase + '_type', '法人', function() { ysTogglePartyType(dIdBase, '法人'); });
+      } else {
+        ysTogglePartyType(pfx + '_d', '法人');
+      }
     } else {
-      if (pr.d_name) { ysSetField(pfx + '_d_name', pr.d_name); filledCount++; }
-      if (pr.d_gender) ysSetSelect(pfx + '_d_gender', pr.d_gender);
-      if (pr.d_phone) { ysSetField(pfx + '_d_phone', pr.d_phone); filledCount++; }
-      if (pr.d_idno) ysSetField(pfx + '_d_idno', pr.d_idno);
-      if (pr.d_addr) { ysSetField(pfx + '_d_addr', pr.d_addr); filledCount++; }
+      if (pr.d_name) { ysSetField(dIdBase + '_name', pr.d_name); filledCount++; }
+      if (pr.d_gender) ysSetSelect(dIdBase + '_gender', pr.d_gender);
+      if (pr.d_phone) { ysSetField(dIdBase + '_phone', pr.d_phone); filledCount++; }
+      if (pr.d_idno) ysSetField(dIdBase + '_idno', pr.d_idno);
+      if (pr.d_addr) { ysSetField(dIdBase + '_addr', pr.d_addr); filledCount++; }
     }
 
     // 填借贷相关字段（仅民间借贷）
@@ -4942,9 +4974,10 @@ function ysFillFormFromParse() {
 
     // 填诉讼请求
     if (pr.claims) {
-      var otherEl = document.getElementById(pfx + '_other');
-      if (!otherEl) otherEl = document.getElementById('mj_other');
-      if (otherEl && !otherEl.value) otherEl.value = '【诉讼请求原文】\n' + pr.claims;
+      var claimsId = (ysState.selectedType === 'jidong') ? 'jd_claim_text' : (pfx + '_other');
+      var claimsEl = document.getElementById(claimsId);
+      if (!claimsEl) claimsEl = document.getElementById('mj_other');
+      if (claimsEl && !claimsEl.value) claimsEl.value = '【诉讼请求原文】\n' + pr.claims;
       filledCount++;
     }
 
@@ -4961,7 +4994,7 @@ function ysFillFormFromParse() {
     if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
     toast('✅ 已自动填入 ' + pr._identified + ' 项要素（' + filledCount + ' 项已填入表单），请核对后生成文书', 'success');
-  }, 200);
+  }, 300);
 }
 
 // 工具：获取表单前缀
