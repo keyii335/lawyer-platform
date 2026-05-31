@@ -522,8 +522,16 @@ function closeModal() {
   document.getElementById('modalOverlay').classList.remove('active');
 }
 
+// ============ ERROR CAPTURE ============
+window.onerror = function(msg, url, line, col, err) {
+  var el = document.getElementById('contentArea');
+  if (el && !el.querySelector('.js-error-banner')) {
+    el.innerHTML = '<div class="js-error-banner" style="background:#fff5f5;border:2px solid #fc8181;border-radius:10px;padding:20px;margin-bottom:16px;"><div style="font-size:16px;font-weight:700;color:#c53030;margin-bottom:8px;">⚠️ 页面加载出错</div><div style="font-size:13px;color:#742a2a;word-break:break-all;">错误: ' + (msg||'未知') + '<br>位置: 第' + (line||'?') + '行 第' + (col||'?') + '列</div></div>' + el.innerHTML;
+  }
+};
 // ============ INIT ============
 document.addEventListener('DOMContentLoaded', function() {
+  try {
   document.querySelectorAll('.nav-item').forEach(function(el) {
     el.addEventListener('click', function() { navigateTo(el.dataset.page); });
   });
@@ -532,6 +540,9 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   navigateTo('dashboard');
   updateReminderBadge();
+  } catch(initErr) {
+    document.getElementById('contentArea').innerHTML = '<div style="background:#fff5f5;border:2px solid #fc8181;border-radius:10px;padding:20px;"><div style="font-size:16px;font-weight:700;color:#c53030;">⚠️ 初始化错误</div><div style="font-size:13px;color:#742a2a;margin-top:8px;word-break:break-all;">' + (initErr.message||initErr) + '</div></div>';
+  }
 });
 
 function updateReminderBadge() {
