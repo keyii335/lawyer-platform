@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>测试页面</title>
+<style>
+  body { margin:0; font-family: sans-serif; display: flex; }
+  .sidebar { width: 230px; background: #1a365d; color: #fff; min-height: 100vh; padding: 20px 0; }
+  .sidebar h1 { font-size: 18px; text-align: center; }
+  .nav-item { padding: 12px 20px; cursor: pointer; }
+  .nav-item:hover { background: rgba(255,255,255,0.1); }
+  .content { flex: 1; padding: 20px; }
+  #contentArea { color: green; font-size: 24px; font-weight: bold; }
+</style>
+</head>
+<body>
+<div class="sidebar"><h1>测试导航</h1><div class="nav-item" onclick="showPage('a')">页面A</div><div class="nav-item" onclick="showPage('b')">页面B</div></div>
+<div class="content"><div id="contentArea">初始内容</div></div>
+<script>
+function showPage(p) { document.getElementById('contentArea').textContent = '你点击了: ' + p; }
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('contentArea').textContent = '页面加载成功！JS正常工作';
+});
+</script>
+</body>
+</html>
