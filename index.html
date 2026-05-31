@@ -566,15 +566,24 @@ function updateReminderBadge() {
 // ============ RENDER ROUTER ============
 function renderPage() {
   var area = document.getElementById('contentArea');
-  switch (currentPage) {
-    case 'dashboard': area.innerHTML = renderDashboard(); break;
-    case 'schedule': area.innerHTML = renderSchedule(); initCalendar(); break;
-    case 'todos': area.innerHTML = renderTodos(); initTodos(); break;
-    case 'cases': area.innerHTML = renderCases(); initCases(); break;
-    case 'summary': area.innerHTML = renderSummary(); initSummary(); break;
-    case 'reminders': area.innerHTML = renderReminders(); initReminders(); break;
-    case 'tools': area.innerHTML = renderTools(); initTools(); break;
-    case 'yaosushi': renderYaosushi(); break;
+  try {
+    switch (currentPage) {
+      case 'dashboard': area.innerHTML = renderDashboard(); break;
+      case 'schedule': area.innerHTML = renderSchedule(); initCalendar(); break;
+      case 'todos': area.innerHTML = renderTodos(); initTodos(); break;
+      case 'cases': area.innerHTML = renderCases(); initCases(); break;
+      case 'summary': area.innerHTML = renderSummary(); initSummary(); break;
+      case 'reminders': area.innerHTML = renderReminders(); initReminders(); break;
+      case 'tools': area.innerHTML = renderTools(); initTools(); break;
+      case 'yaosushi': renderYaosushi(); break;
+      default: area.innerHTML = '<div style="padding:20px;color:red;">未知页面: ' + esc(currentPage) + '</div>';
+    }
+  } catch(e) {
+    area.innerHTML = '<div style="background:#fff5f5;border:2px solid #fc8181;border-radius:10px;padding:20px;">'
+      + '<div style="font-size:16px;font-weight:700;color:#c53030;margin-bottom:8px;">⚠️ 模块[' + (pageTitles[currentPage]||currentPage) + ']加载出错</div>'
+      + '<div style="font-size:13px;color:#742a2a;word-break:break-all;">错误: ' + esc(e.message||e) + '<br>行号: ' + (e.lineNumber||'未知') + '</div>'
+      + '<button style="margin-top:12px;" class="btn btn-sm btn-outline" onclick="location.reload()">🔄 刷新重试</button>'
+      + '</div>';
   }
   updateReminderBadge();
 }
