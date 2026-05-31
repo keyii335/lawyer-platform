@@ -385,6 +385,14 @@
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/mammoth@1.8.0/mammoth.browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.min.js"></script>
+<script>
+if (typeof pdfjsLib !== 'undefined') {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@2.16.105/build/pdf.worker.min.js';
+}
+</script>
+
 <script>
 
 // ============ DATA LAYER ============
@@ -1974,9 +1982,9 @@ function renderYaosushi() {
     html += '<div class="ys-parse-upload-area" onclick="document.getElementById(\'ysFileInput\').click()">';
     html += '<div class="ys-parse-upload-icon">📄</div>';
     html += '<div class="ys-parse-upload-text">点击选择或拖拽文件到此处</div>';
-    html += '<div class="ys-parse-upload-hint">支持 .txt 文件（.docx 需先导出为纯文本）</div>';
+    html += '<div class="ys-parse-upload-hint">支持 .pdf .docx .txt 文件，自动提取文字后智能识别</div>';
     html += '</div>';
-    html += '<input type="file" id="ysFileInput" accept=".txt,.text" style="display:none" onchange="ysHandleFileUpload(this)">';
+    html += '<input type="file" id="ysFileInput" accept=".pdf,.docx,.doc,.txt,.text" style="display:none" onchange="ysHandleFileUpload(this)">';
   } else {
     html += '<textarea class="ys-parse-textarea" id="ysParseInput" placeholder="请将传统格式的起诉状原文粘贴至此处...\n\n例如：\n民事起诉状\n原告：张三，男，汉族，1980年1月1日出生，现住...\n被告：李四，男，汉族，现住...\n诉讼请求：\n一、判令被告偿还借款本金100000元...\n事实与理由：\n2022年3月1日，被告向原告借款..."></textarea>';
   }
@@ -1993,11 +2001,11 @@ function renderYaosushi() {
     if (pr._typeLabel) html += '<span class="ys-parse-badge partial" style="margin-left:4px;">案由：' + pr._typeLabel + '</span>';
     html += '</div>';
     var showFields = [
-      ['案由类型', pr._typeLabel], ['原告姓名', pr.p_name], ['原告地址', pr.p_addr], ['原告电话', pr.p_phone],
-      ['被告姓名', pr.d_name], ['被告地址', pr.d_addr], ['被告电话', pr.d_phone],
+      ['案由类型', pr._typeLabel], ['原告姓名', pr.p_name], ['原告类型', pr.p_orgType], ['原告地址', pr.p_addr], ['原告电话', pr.p_phone],
+      ['被告姓名', pr.d_name], ['被告类型', pr.d_orgType], ['被告地址', pr.d_addr], ['被告电话', pr.d_phone],
       ['借款金额', pr.amount ? pr.amount + ' 元' : null], ['借款期限', pr.period],
       ['约定利率', pr.rate ? pr.rate + '%/年' : null], ['出借方式', pr.payway],
-      ['诉讼请求', pr.claims]
+      ['合同签订日期', pr.ct_date], ['诉讼请求', pr.claims], ['事实与理由', pr.facts ? '已识别（' + pr.facts.length + '字）' : null]
     ];
     showFields.forEach(function(f) {
       if (f[1]) {
@@ -2065,38 +2073,192 @@ function renderYsForm(typeId) {
   }
 }
 
-// ==== COMMON PARTY INFO SECTION ====
-function ysPartySection(prefix, label, showThird) {
+// ==== COMMON PARTY INFO SECTION (官方模板格式) ====
+function ysPartySection(prefix, plaintiffLabel, defendantLabel, showThird) {
   var s = '<div class="ys-form-section">';
   s += '<div class="ys-section-title">当事人信息</div>';
-  // 原告
-  s += '<div style="font-weight:600;margin-bottom:8px;font-size:14px;">' + label + '（原告）</div>';
-  s += '<div class="ys-grid-2">';
-  s += '<div class="ys-field"><label>姓名/名称 <span class="ys-req">*</span></label><input id="' + prefix + '_p_name" placeholder="自然人姓名或法人名称" /></div>';
-  s += '<div class="ys-field"><label>性别（自然人）</label><select id="' + prefix + '_p_gender"><option value="">—</option><option>男</option><option>女</option></select></div>';
+
+  // ===== 原告 =====
+  s += '<div style="font-weight:700;margin:10px 0 6px;font-size:14px;color:var(--primary);border-left:3px solid var(--primary);padding-left:8px;">原告（' + plaintiffLabel + '）</div>';
+  // 自然人/法人切换
+  s += '<div style="margin-bottom:8px;">';
+  s += '<label style="font-size:13px;margin-right:12px;cursor:pointer;"><input type="radio" name="' + prefix + '_p_type" value="自然人" checked onchange="ysTogglePartyType(\'' + prefix + '_p\',\'自然人\')"> 自然人</label>';
+  s += '<label style="font-size:13px;cursor:pointer;"><input type="radio" name="' + prefix + '_p_type" value="法人" onchange="ysTogglePartyType(\'' + prefix + '_p\',\'法人\')"> 法人/非法人组织</label>';
+  s += '</div>';
+
+  // 原告 - 自然人
+  s += '<div id="' + prefix + '_p_nature">';
+  s += '<div class="ys-grid-3">';
+  s += '<div class="ys-field"><label>姓名 <span class="ys-req">*</span></label><input id="' + prefix + '_p_name" placeholder="原告姓名" /></div>';
+  s += '<div class="ys-field"><label>性别</label><select id="' + prefix + '_p_gender"><option value="">请选择</option><option>男</option><option>女</option></select></div>';
+  s += '<div class="ys-field"><label>民族</label><input id="' + prefix + '_p_ethnic" placeholder="如：汉族" /></div>';
   s += '</div>';
   s += '<div class="ys-grid-2">';
-  s += '<div class="ys-field"><label>联系电话</label><input id="' + prefix + '_p_phone" placeholder="联系电话" /></div>';
-  s += '<div class="ys-field"><label>证件号码</label><input id="' + prefix + '_p_idno" placeholder="身份证/统一社会信用代码" /></div>';
-  s += '</div>';
-  s += '<div class="ys-field"><label>住所地/主要办事机构所在地</label><input id="' + prefix + '_p_addr" placeholder="详细地址" /></div>';
-  s += '<div class="ys-grid-2">';
-  s += '<div class="ys-field"><label>委托诉讼代理人</label><input id="' + prefix + '_p_agent" placeholder="代理律师/法律工作者姓名" /></div>';
-  s += '<div class="ys-field"><label>代理权限</label><select id="' + prefix + '_p_agentlv"><option value="">—</option><option>一般授权</option><option>特别授权</option></select></div>';
-  s += '</div>';
-  // 被告
-  s += '<div style="font-weight:600;margin:14px 0 8px;font-size:14px;">被告</div>';
-  s += '<div class="ys-grid-2">';
-  s += '<div class="ys-field"><label>姓名/名称 <span class="ys-req">*</span></label><input id="' + prefix + '_d_name" placeholder="被告姓名或法人名称" /></div>';
-  s += '<div class="ys-field"><label>性别（自然人）</label><select id="' + prefix + '_d_gender"><option value="">—</option><option>男</option><option>女</option></select></div>';
+  s += '<div class="ys-field"><label>出生日期</label><input id="' + prefix + '_p_birth" type="date" /></div>';
+  s += '<div class="ys-field"><label>联系电话</label><input id="' + prefix + '_p_phone" placeholder="手机号码" /></div>';
   s += '</div>';
   s += '<div class="ys-grid-2">';
-  s += '<div class="ys-field"><label>联系电话</label><input id="' + prefix + '_d_phone" placeholder="联系电话" /></div>';
-  s += '<div class="ys-field"><label>证件号码</label><input id="' + prefix + '_d_idno" placeholder="身份证/统一社会信用代码" /></div>';
+  s += '<div class="ys-field"><label>工作单位</label><input id="' + prefix + '_p_workunit" placeholder="工作单位" /></div>';
+  s += '<div class="ys-field"><label>职务</label><input id="' + prefix + '_p_position" placeholder="职务" /></div>';
   s += '</div>';
-  s += '<div class="ys-field"><label>住所地/主要办事机构所在地</label><input id="' + prefix + '_d_addr" placeholder="详细地址" /></div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>住所地（户籍所在地）</label><input id="' + prefix + '_p_addr" placeholder="详细地址" /></div>';
+  s += '<div class="ys-field"><label>经常居住地</label><input id="' + prefix + '_p_resident" placeholder="如有不同请填写" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>证件类型</label><select id="' + prefix + '_p_idtype"><option>身份证</option><option>护照</option><option>军官证</option><option>其他</option></select></div>';
+  s += '<div class="ys-field"><label>证件号码</label><input id="' + prefix + '_p_idno" placeholder="证件号码" /></div>';
+  s += '</div>';
+  s += '</div>';
+
+  // 原告 - 法人/非法人组织（默认隐藏）
+  s += '<div id="' + prefix + '_p_legal" style="display:none;">';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>名称 <span class="ys-req">*</span></label><input id="' + prefix + '_p_org_name" placeholder="法人/组织全称" /></div>';
+  s += '<div class="ys-field"><label>法定代表人/负责人</label><input id="' + prefix + '_p_org_legal" placeholder="姓名" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>住所地（主要办事机构所在地）</label><input id="' + prefix + '_p_org_addr" placeholder="详细地址" /></div>';
+  s += '<div class="ys-field"><label>注册地/登记地</label><input id="' + prefix + '_p_org_regaddr" placeholder="注册地址" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>统一社会信用代码</label><input id="' + prefix + '_p_org_code" placeholder="18位代码" /></div>';
+  s += '<div class="ys-field"><label>联系电话</label><input id="' + prefix + '_p_org_phone" placeholder="联系电话" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>职务</label><input id="' + prefix + '_p_org_pos" placeholder="职务" /></div>';
+  s += '<div class="ys-field"><label>所有制性质</label><select id="' + prefix + '_p_org_ownership"><option value="">请选择</option><option>国有（控股）</option><option>国有（参股）</option><option>民营</option><option>其他</option></select></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>类型</label><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;font-size:13px;">';
+  var orgTypes = ['有限责任公司','股份有限公司','上市公司','事业单位','社会团体','基金会','社会服务机构','机关法人','个人独资企业','合伙企业'];
+  orgTypes.forEach(function(t) {
+    s += '<label style="cursor:pointer;"><input type="checkbox" name="' + prefix + '_p_org_type" value="' + t + '"> ' + t + '</label>';
+  });
+  s += '</div></div>';
+  s += '</div>';
+
+  // 委托诉讼代理人
+  s += '<div style="margin-top:10px;padding:8px 12px;background:#fafaf5;border-radius:6px;">';
+  s += '<div style="font-size:13px;font-weight:600;margin-bottom:6px;">委托诉讼代理人</div>';
+  s += '<div style="margin-bottom:6px;"><label style="font-size:13px;margin-right:10px;"><input type="radio" name="' + prefix + '_agent_has" value="有" onchange="ysToggleAgent(\'' + prefix + '\',true)"> 有</label>';
+  s += '<label style="font-size:13px;"><input type="radio" name="' + prefix + '_agent_has" value="无" checked onchange="ysToggleAgent(\'' + prefix + '\',false)"> 无</label></div>';
+  s += '<div id="' + prefix + '_agent_info" style="display:none;">';
+  s += '<div class="ys-grid-3">';
+  s += '<div class="ys-field"><label>姓名</label><input id="' + prefix + '_p_agent" placeholder="代理人姓名" /></div>';
+  s += '<div class="ys-field"><label>单位</label><input id="' + prefix + '_p_agent_org" placeholder="律师事务所" /></div>';
+  s += '<div class="ys-field"><label>联系电话</label><input id="' + prefix + '_p_agent_phone" placeholder="电话" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>职务</label><input id="' + prefix + '_p_agent_pos" placeholder="职务" /></div>';
+  s += '<div class="ys-field"><label>代理权限</label><select id="' + prefix + '_p_agentlv"><option value="">请选择</option><option>一般授权</option><option>特别授权</option></select></div>';
+  s += '</div></div></div>';
+
+  // ===== 被告 =====
+  s += '<div style="font-weight:700;margin:16px 0 6px;font-size:14px;color:#e74c3c;border-left:3px solid #e74c3c;padding-left:8px;">被告（' + defendantLabel + '）</div>';
+  s += '<div style="margin-bottom:8px;">';
+  s += '<label style="font-size:13px;margin-right:12px;cursor:pointer;"><input type="radio" name="' + prefix + '_d_type" value="自然人" checked onchange="ysTogglePartyType(\'' + prefix + '_d\',\'自然人\')"> 自然人</label>';
+  s += '<label style="font-size:13px;cursor:pointer;"><input type="radio" name="' + prefix + '_d_type" value="法人" onchange="ysTogglePartyType(\'' + prefix + '_d\',\'法人\')"> 法人/非法人组织</label>';
+  s += '</div>';
+
+  // 被告 - 自然人
+  s += '<div id="' + prefix + '_d_nature">';
+  s += '<div class="ys-grid-3">';
+  s += '<div class="ys-field"><label>姓名 <span class="ys-req">*</span></label><input id="' + prefix + '_d_name" placeholder="被告姓名" /></div>';
+  s += '<div class="ys-field"><label>性别</label><select id="' + prefix + '_d_gender"><option value="">请选择</option><option>男</option><option>女</option></select></div>';
+  s += '<div class="ys-field"><label>民族</label><input id="' + prefix + '_d_ethnic" placeholder="如：汉族" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>出生日期</label><input id="' + prefix + '_d_birth" type="date" /></div>';
+  s += '<div class="ys-field"><label>联系电话</label><input id="' + prefix + '_d_phone" placeholder="手机号码" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>工作单位</label><input id="' + prefix + '_d_workunit" placeholder="工作单位" /></div>';
+  s += '<div class="ys-field"><label>职务</label><input id="' + prefix + '_d_position" placeholder="职务" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>住所地（户籍所在地）</label><input id="' + prefix + '_d_addr" placeholder="详细地址" /></div>';
+  s += '<div class="ys-field"><label>经常居住地</label><input id="' + prefix + '_d_resident" placeholder="如有不同请填写" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>证件类型</label><select id="' + prefix + '_d_idtype"><option>身份证</option><option>护照</option><option>军官证</option><option>其他</option></select></div>';
+  s += '<div class="ys-field"><label>证件号码</label><input id="' + prefix + '_d_idno" placeholder="证件号码" /></div>';
+  s += '</div>';
+  s += '</div>';
+
+  // 被告 - 法人/非法人组织
+  s += '<div id="' + prefix + '_d_legal" style="display:none;">';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>名称 <span class="ys-req">*</span></label><input id="' + prefix + '_d_org_name" placeholder="法人/组织全称" /></div>';
+  s += '<div class="ys-field"><label>法定代表人/负责人</label><input id="' + prefix + '_d_org_legal" placeholder="姓名" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>住所地（主要办事机构所在地）</label><input id="' + prefix + '_d_org_addr" placeholder="详细地址" /></div>';
+  s += '<div class="ys-field"><label>注册地/登记地</label><input id="' + prefix + '_d_org_regaddr" placeholder="注册地址" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>统一社会信用代码</label><input id="' + prefix + '_d_org_code" placeholder="18位代码" /></div>';
+  s += '<div class="ys-field"><label>联系电话</label><input id="' + prefix + '_d_org_phone" placeholder="联系电话" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>职务</label><input id="' + prefix + '_d_org_pos" placeholder="职务" /></div>';
+  s += '<div class="ys-field"><label>所有制性质</label><select id="' + prefix + '_d_org_ownership"><option value="">请选择</option><option>国有（控股）</option><option>国有（参股）</option><option>民营</option><option>其他</option></select></div>';
+  s += '</div>';
+  s += '<div class="ys-field"><label>类型</label><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;font-size:13px;">';
+  orgTypes.forEach(function(t) {
+    s += '<label style="cursor:pointer;"><input type="checkbox" name="' + prefix + '_d_org_type" value="' + t + '"> ' + t + '</label>';
+  });
+  s += '</div></div>';
+  s += '</div>';
+
+  // ===== 第三人（可选） =====
+  s += '<div style="margin-top:14px;padding-top:10px;border-top:1px dashed #ddd;">';
+  s += '<div style="font-size:13px;margin-bottom:6px;"><label style="cursor:pointer;"><input type="checkbox" id="' + prefix + '_has_third" onchange="ysToggleThird(\'' + prefix + '\')"> 添加第三人</label></div>';
+  s += '<div id="' + prefix + '_third_section" style="display:none;">';
+  s += '<div style="margin-bottom:8px;">';
+  s += '<label style="font-size:13px;margin-right:12px;cursor:pointer;"><input type="radio" name="' + prefix + '_t_type" value="自然人" checked onchange="ysTogglePartyType(\'' + prefix + '_t\',\'自然人\')"> 自然人</label>';
+  s += '<label style="font-size:13px;cursor:pointer;"><input type="radio" name="' + prefix + '_t_type" value="法人" onchange="ysTogglePartyType(\'' + prefix + '_t\',\'法人\')"> 法人/非法人组织</label>';
+  s += '</div>';
+  s += '<div id="' + prefix + '_t_nature">';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>姓名</label><input id="' + prefix + '_t_name" placeholder="第三人姓名" /></div>';
+  s += '<div class="ys-field"><label>联系电话</label><input id="' + prefix + '_t_phone" placeholder="电话" /></div>';
+  s += '</div>';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>住所地</label><input id="' + prefix + '_t_addr" placeholder="地址" /></div>';
+  s += '<div class="ys-field"><label>证件号码</label><input id="' + prefix + '_t_idno" placeholder="证件号码" /></div>';
+  s += '</div></div>';
+  s += '<div id="' + prefix + '_t_legal" style="display:none;">';
+  s += '<div class="ys-grid-2">';
+  s += '<div class="ys-field"><label>名称</label><input id="' + prefix + '_t_org_name" placeholder="第三人组织全称" /></div>';
+  s += '<div class="ys-field"><label>住所地</label><input id="' + prefix + '_t_org_addr" placeholder="地址" /></div>';
+  s += '</div></div>';
+  s += '</div></div>';
+
   s += '</div>';
   return s;
+}
+
+// 切换当事人类型（自然人/法人）
+function ysTogglePartyType(idBase, type) {
+  var natureEl = document.getElementById(idBase + '_nature');
+  var legalEl = document.getElementById(idBase + '_legal');
+  if (natureEl && legalEl) {
+    natureEl.style.display = type === '自然人' ? '' : 'none';
+    legalEl.style.display = type === '法人' ? '' : 'none';
+  }
+}
+
+// 切换代理人显示
+function ysToggleAgent(prefix, show) {
+  var el = document.getElementById(prefix + '_agent_info');
+  if (el) el.style.display = show ? '' : 'none';
+}
+
+// 切换第三人显示
+function ysToggleThird(prefix) {
+  var cb = document.getElementById(prefix + '_has_third');
+  var el = document.getElementById(prefix + '_third_section');
+  if (cb && el) el.style.display = cb.checked ? '' : 'none';
 }
 
 function ysGetV(id) {
@@ -2114,7 +2276,7 @@ function ysGetChecked(name) {
 // ==== 民间借贷纠纷 ====
 function renderYsFormMinjie() {
   var s = '<div id="ysForm_minjie">';
-  s += ysPartySection('mj', '原告（出借方）');
+  s += ysPartySection('mj', '出借方', '借款方', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
   s += '<div class="ys-grid-2">';
   s += '<div class="ys-field"><label>借款本金（元）</label><input id="mj_principal" type="number" placeholder="如：100000" /></div>';
@@ -2161,7 +2323,7 @@ function renderYsFormMinjie() {
 // ==== 买卖合同纠纷 ====
 function renderYsFormMaimai() {
   var s = '<div id="ysForm_maimai">';
-  s += ysPartySection('mm', '原告');
+  s += ysPartySection('mm', '买方/卖方', '对方', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
   s += '<div class="ys-grid-2">';
   s += '<div class="ys-field"><label>原告角色</label><select id="mm_role"><option value="卖方">原告为卖方（主张价款）</option><option value="买方">原告为买方（主张违约）</option></select></div>';
@@ -2200,7 +2362,7 @@ function renderYsFormMaimai() {
 // ==== 房屋买卖合同纠纷 ====
 function renderYsFormFangmaijie() {
   var s = '<div id="ysForm_fangmaijie">';
-  s += ysPartySection('fmj', '原告');
+  s += ysPartySection('fmj', '买方/卖方', '对方', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
   s += '<div class="ys-grid-2">';
   s += '<div class="ys-field"><label>主张确认合同关系</label><select id="fmj_ctclaim"><option>继续履行</option><option>解除合同</option><option>确认合同无效</option><option>撤销合同</option><option>无此问题</option></select></div>';
@@ -2243,7 +2405,7 @@ function renderYsFormFangmaijie() {
 // ==== 房屋租赁合同纠纷 ====
 function renderYsFormFangzu() {
   var s = '<div id="ysForm_fangzu">';
-  s += ysPartySection('fz', '原告');
+  s += ysPartySection('fz', '承租方/出租方', '对方', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
   s += '<div class="ys-grid-2">';
   s += '<div class="ys-field"><label>原告角色</label><select id="fz_role"><option>出租方</option><option>承租方</option></select></div>';
@@ -2279,7 +2441,7 @@ function renderYsFormFangzu() {
 // ==== 金融借款合同纠纷 ====
 function renderYsFormJinjie() {
   var s = '<div id="ysForm_jinjie">';
-  s += ysPartySection('jj', '原告（贷款方）');
+  s += ysPartySection('jj', '贷款方', '借款方', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
   s += '<div class="ys-grid-2">';
   s += '<div class="ys-field"><label>借款本金（元）</label><input id="jj_principal" type="number" /></div>';
@@ -2320,7 +2482,7 @@ function renderYsFormJinjie() {
 // ==== 劳动争议 ====
 function renderYsFormLaodong() {
   var s = '<div id="ysForm_laodong">';
-  s += ysPartySection('ld', '原告（劳动者）');
+  s += ysPartySection('ld', '劳动者', '用人单位', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
   s += '<div class="ys-grid-3">';
   s += '<div class="ys-field"><label>主张工资支付</label><select id="ld_wage"><option>否</option><option>是</option></select></div>';
@@ -2364,7 +2526,7 @@ function renderYsFormLaodong() {
 // ==== 离婚纠纷 ====
 function renderYsFormLihun() {
   var s = '<div id="ysForm_lihun">';
-  s += ysPartySection('lh', '原告');
+  s += ysPartySection('lh', '一方', '另一方', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
   s += '<div class="ys-field"><label>解除婚姻关系（具体主张）</label><input id="lh_divorceclaim" value="判决原告与被告离婚" /></div>';
   s += '<div class="ys-grid-2">';
@@ -2398,7 +2560,7 @@ function renderYsFormLihun() {
 // ==== 建设工程施工合同纠纷 ====
 function renderYsFormJianshe() {
   var s = '<div id="ysForm_jianshe">';
-  s += ysPartySection('js', '原告');
+  s += ysPartySection('js', '承包方', '发包方', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
   s += '<div class="ys-grid-2">';
   s += '<div class="ys-field"><label>主张支付工程款（元）</label><input id="js_claim" type="number" /></div>';
@@ -2433,7 +2595,7 @@ function renderYsFormJianshe() {
 // ==== 机动车交通事故 ====
 function renderYsFormJidong() {
   var s = '<div id="ysForm_jidong">';
-  s += ysPartySection('jd', '原告（受害方）');
+  s += ysPartySection('jd', '受害方', '肇事方', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求（赔偿项目）</div>';
   s += '<div class="ys-grid-3">';
   s += '<div class="ys-field"><label>医疗费（元）</label><input id="jd_medical" type="number" placeholder="0" /></div>';
@@ -2476,7 +2638,7 @@ function renderYsFormJidong() {
 // ==== 不正当竞争纠纷 ====
 function renderYsFormBuzh() {
   var s = '<div id="ysForm_buzh">';
-  s += ysPartySection('bz', '原告');
+  s += ysPartySection('bz', '投保人/被保险人', '保险人', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
   s += '<div class="ys-field"><label>不正当竞争行为类型</label><select id="bz_acttype"><option>仿冒混淆</option><option>商业诋毁</option><option>虚假宣传</option><option>侵犯商业秘密</option><option>其他</option></select></div>';
   s += '<div class="ys-grid-2">';
@@ -2501,7 +2663,7 @@ function renderYsFormBuzh() {
 // ==== 财产损失保险合同纠纷 ====
 function renderYsFormCaisun() {
   var s = '<div id="ysForm_caisun">';
-  s += ysPartySection('cs', '原告（被保险人）');
+  s += ysPartySection('cs', '被保险人', '保险人', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
   s += '<div class="ys-grid-2">';
   s += '<div class="ys-field"><label>主张保险赔偿金（元）</label><input id="cs_claim" type="number" /></div>';
@@ -2730,7 +2892,9 @@ function ysGenDoc(typeId) {
 
 function ysGenMinjie() {
   var p = ysGetV('mj_p_name'), d = ysGetV('mj_d_name');
-  if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
+  var pOrg = ysGetV('mj_p_org_name'), dOrg = ysGetV('mj_d_org_name');
+  if (!p && !pOrg) { alert('请填写原告信息！'); return ''; }
+  if (!d && !dOrg) { alert('请填写被告信息！'); return ''; }
   var principal = ysGetV('mj_principal'), interest = ysGetV('mj_interest');
   var calcdate = ysGetV('mj_calcdate'), toend = ysGetV('mj_toend');
   var othercost = ysGetV('mj_othercost');
@@ -2739,44 +2903,137 @@ function ysGenMinjie() {
   var payway = ysGetV('mj_payway'), period = ysGetV('mj_period'), rate = ysGetV('mj_rate');
   var expired = ysGetV('mj_expired'), repaidp = ysGetV('mj_repaid_p'), repaidi = ysGetV('mj_repaid_i');
   var guarantee = ysGetV('mj_guarantee'), other = ysGetV('mj_other'), basis = ysGetV('mj_basis');
-  var paddr = ysGetV('mj_p_addr'), pphone = ysGetV('mj_p_phone');
-  var daddr = ysGetV('mj_d_addr'), dphone = ysGetV('mj_d_phone');
-  var pagent = ysGetV('mj_p_agent'), pagentlv = ysGetV('mj_p_agentlv');
+  var pgender = ysGetV('mj_p_gender'), pphone = ysGetV('mj_p_phone'), paddr = ysGetV('mj_p_addr');
+  var presid = ysGetV('mj_p_resident'), pidtype = ysGetV('mj_p_idtype'), pidno = ysGetV('mj_p_idno');
+  var pbirth = ysGetV('mj_p_birth'), pethnic = ysGetV('mj_p_ethnic'), pwork = ysGetV('mj_p_workunit'), ppos = ysGetV('mj_p_position');
+  var dgender = ysGetV('mj_d_gender'), dphone = ysGetV('mj_d_phone'), daddr = ysGetV('mj_d_addr');
+  var didno = ysGetV('mj_d_idno'), dbirth = ysGetV('mj_d_birth'), dethnic = ysGetV('mj_d_ethnic');
+  var dwork = ysGetV('mj_d_workunit'), dpos = ysGetV('mj_d_position');
+  var pagent = ysGetV('mj_p_agent'), pagentlv = ysGetV('mj_p_agentlv'), pagentorg = ysGetV('mj_p_agent_org');
+  var displayName = p || pOrg;
 
   var html = ysDocHeader('民事起诉状', '民间借贷纠纷');
   html += ysDocTable([
-    ['具状人（签字、盖章）：' + p + '　　日期：　　年　　月　　日'],
+    ['说明'],
+    ['1', '起诉时需向人民法院提交证明您身份的材料，如身份证复印件、营业执照复印件等。'],
+    ['2', '本表所列内容是您提起诉讼以及人民法院查明案件事实所需，请务必如实填写。'],
+    ['3', '本表有些内容可能与您的案件无关，您认为与案件无关的项目可以填"无"或不填。'],
   ]);
   html += '<br>';
+
+  // 当事人信息
   html += ysDocTable([
-    ['★说明★ 本表为要素式诉状，请如实填写各要素项目。'],
     ['当事人信息'],
-    ['原告（姓名/名称）', p],
-    ['住所地', paddr || '——'],
-    ['联系电话', pphone || '——'],
-    ['委托诉讼代理人', pagent ? pagent + '（' + pagentlv + '）' : '无'],
-    ['被告（姓名/名称）', d],
-    ['住所地', daddr || '——'],
-    ['联系电话', dphone || '——'],
-    ['诉讼请求'],
-    ['1. 本金', '截至' + (calcdate || '起诉之日') + '止，尚欠本金 ' + (principal || '______') + ' 元（人民币）'],
-    ['2. 利息', '截至' + (calcdate || '起诉之日') + '止，尚欠利息 ' + (interest || '______') + ' 元；是否请求支付至实际清偿之日止：' + toend],
-    ['3. 其他费用', othercost || '无'],
-    ['约定管辖和诉前保全'],
-    ['有无仲裁/法院管辖约定', '无（如有请另注明）'],
-    ['是否已经诉前保全', '否（如有请另注明保全案号）'],
-    ['事实与理由'],
-    ['1. 合同名称及签订情况', ctname || '——'],
-    ['2. 签订地点', ctplace || '——'],
-    ['3. 借款金额（约定）', (amount || '——') + ' 元；实际出借：' + (actual || '——') + ' 元；方式：' + payway],
-    ['4. 借款期限', period || '——；是否到期：' + expired],
-    ['5. 约定利率', rate ? rate + '%/年' : '——'],
-    ['6. 还款情况', '已还本金：' + (repaidp||'0') + '元；已还利息：' + (repaidi||'0') + '元'],
-    ['7. 担保情况', guarantee || '无'],
-    ['8. 其他说明', other || '无'],
-    ['9. 请求依据', basis],
   ]);
-  html += '<div class="ys-preview-signature">具状人：' + p + '<br>日期：　　年　　月　　日</div>';
+  // 原告
+  if (pOrg) {
+    html += ysDocTable([
+      ['原告（法人、非法人组织）'],
+      ['名称', pOrg],
+      ['住所地（主要办事机构所在地）', ysGetV('mj_p_org_addr') || '——'],
+      ['注册地/登记地', ysGetV('mj_p_org_regaddr') || '——'],
+      ['法定代表人/负责人', ysGetV('mj_p_org_legal') || '——'],
+      ['统一社会信用代码', ysGetV('mj_p_org_code') || '——'],
+      ['联系电话', ysGetV('mj_p_org_phone') || '——'],
+    ]);
+  } else {
+    html += ysDocTable([
+      ['原告（自然人）'],
+      ['姓名', p],
+      ['性别', pgender || '——'],
+      ['出生日期', pbirth || '——'],
+      ['民族', pethnic || '——'],
+      ['工作单位', pwork || '——'],
+      ['职务', ppos || '——'],
+      ['联系电话', pphone || '——'],
+      ['住所地（户籍所在地）', paddr || '——'],
+      ['经常居住地', presid || '——'],
+      ['证件类型', pidtype || '——'],
+      ['证件号码', pidno || '——'],
+    ]);
+  }
+  // 原告代理人
+  html += ysDocTable([
+    ['委托诉讼代理人', pagent ? (pagent + '（' + (pagentorg||'') + '，' + pagentlv + '）') : '无'],
+  ]);
+  // 被告
+  if (dOrg) {
+    html += ysDocTable([
+      ['被告（法人、非法人组织）'],
+      ['名称', dOrg],
+      ['住所地（主要办事机构所在地）', ysGetV('mj_d_org_addr') || '——'],
+      ['法定代表人/负责人', ysGetV('mj_d_org_legal') || '——'],
+      ['统一社会信用代码', ysGetV('mj_d_org_code') || '——'],
+    ]);
+  } else {
+    html += ysDocTable([
+      ['被告（自然人）'],
+      ['姓名', d],
+      ['性别', dgender || '——'],
+      ['出生日期', dbirth || '——'],
+      ['民族', dethnic || '——'],
+      ['工作单位', dwork || '——'],
+      ['职务', dpos || '——'],
+      ['联系电话', dphone || '——'],
+      ['住所地（户籍所在地）', daddr || '——'],
+      ['证件号码', didno || '——'],
+    ]);
+  }
+
+  // 诉讼请求
+  html += '<br>';
+  html += ysDocTable([
+    ['诉讼请求'],
+    ['（可完整表述诉讼请求；为方便、准确梳理要点，相关内容请在下方要素式表格中填写）'],
+    ['1. 本金', '截至' + (calcdate || '____年____月____日') + '止，尚欠本金 ' + (principal || '______') + ' 元（人民币，下同）'],
+    ['2. 利息', '截至' + (calcdate || '____年____月____日') + '止，尚欠利息 ' + (interest || '______') + ' 元'],
+    ['计算方式', rate ? rate + '%/年' : '——'],
+    ['是否请求支付至实际清偿之日止', toend || '否'],
+    ['3. 是否要求提前还款或解除合同', '否'],
+    ['4. 是否主张担保权利', guarantee ? '是（' + guarantee + '）' : '否'],
+    ['5. 是否主张实现债权的费用', othercost ? '是（' + othercost + '）' : '否'],
+    ['6. 是否主张诉讼费用', '是'],
+    ['7. 其他请求', other || '无'],
+    ['8. 标的总额', '——'],
+  ]);
+
+  // 约定管辖和诉前保全
+  html += '<br>';
+  html += ysDocTable([
+    ['约定管辖和诉前保全'],
+    ['1. 有无仲裁、法院管辖约定', '无□'],
+    ['2. 是否已经诉前保全', '否□'],
+  ]);
+
+  // 事实与理由
+  html += '<br>';
+  html += ysDocTable([
+    ['事实与理由'],
+    ['（可完整表述纠纷涉及的事实与理由；为方便、准确梳理要点，相关内容请在下方要素式表格中填写）'],
+    ['1. 合同签订情况', ctname || '——'],
+    ['2. 签订地点', ctplace || '——'],
+    ['3. 借款金额', '约定：' + (amount || '——') + ' 元；实际提供：' + (actual || '——') + ' 元'],
+    ['4. 提供方式', payway || '——'],
+    ['5. 借款期限', period || '——；是否到期：' + (expired || '——')],
+    ['6. 借款利率', rate ? rate + '%/年' : '——'],
+    ['7. 还款方式', '——'],
+    ['8. 还款情况', '已还本金：' + (repaidp||'0') + '元；已还利息：' + (repaidi||'0') + '元'],
+    ['9. 是否存在逾期还款', expired || '——'],
+    ['10. 担保人、担保物', guarantee || '无'],
+    ['11. 其他需要说明的内容', other || '无'],
+    ['12. 请求依据', basis],
+    ['13. 证据清单', '——'],
+  ]);
+
+  // 调解意愿
+  html += '<br>';
+  html += ysDocTable([
+    ['对纠纷解决方式的意愿'],
+    ['是否了解调解', '了解□ 不了解□'],
+    ['是否考虑先行调解', '暂不确定，想要了解更多内容□'],
+  ]);
+
+  html += '<div class="ys-preview-signature">具状人（签字、盖章）：' + displayName + '<br><br>日期：　　　　年　　　　月　　　　日</div>';
   html += ysCopyBtn('minjie') + '</div>';
   return html;
 }
@@ -3282,22 +3539,89 @@ function ysSetParseTab(tab) {
   renderYaosushi();
 }
 
-// 处理文件上传
+// 处理文件上传（支持PDF、DOCX、TXT）
 function ysHandleFileUpload(input) {
   var file = input.files && input.files[0];
   if (!file) return;
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    var text = e.target.result || '';
-    ysState.parseTab = 'text'; // 切回文本模式显示内容
-    renderYaosushi();
-    setTimeout(function() {
-      var ta = document.getElementById('ysParseInput');
-      if (ta) { ta.value = text; }
-    }, 50);
-    toast('文件读取成功，点击「立即识别」开始解析', 'success');
-  };
-  reader.readAsText(file, 'UTF-8');
+  var ext = (file.name || '').split('.').pop().toLowerCase();
+  toast('正在读取文件: ' + file.name + ' ...', 'info');
+
+  if (ext === 'txt' || ext === 'text') {
+    // 纯文本文件，直接读取
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      ysShowExtractedText(e.target.result || '', file.name);
+    };
+    reader.readAsText(file, 'UTF-8');
+  } else if (ext === 'docx' || ext === 'doc') {
+    // DOCX文件，使用mammoth.js解析
+    if (typeof mammoth === 'undefined') {
+      toast('DOCX解析库未加载，请稍后重试或使用纯文本格式', 'warning');
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var arrayBuffer = e.target.result;
+      mammoth.extractRawText({ arrayBuffer: arrayBuffer }).then(function(result) {
+        ysShowExtractedText(result.value || '', file.name);
+      }).catch(function(err) {
+        toast('DOCX解析失败: ' + err.message, 'error');
+      });
+    };
+    reader.readAsArrayBuffer(file);
+  } else if (ext === 'pdf') {
+    // PDF文件，使用pdf.js解析
+    if (typeof pdfjsLib === 'undefined') {
+      toast('PDF解析库未加载，请稍后重试或使用纯文本格式', 'warning');
+      return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      var typedArray = new Uint8Array(e.target.result);
+      pdfjsLib.getDocument(typedArray).promise.then(function(pdf) {
+        var totalPages = pdf.numPages;
+        var allText = '';
+        var loaded = 0;
+        function loadPage(pageNum) {
+          pdf.getPage(pageNum).then(function(page) {
+            page.getTextContent().then(function(content) {
+              var pageText = content.items.map(function(item) { return item.str; }).join(' ');
+              allText += pageText + '\n';
+              loaded++;
+              if (loaded < totalPages) {
+                loadPage(loaded + 1);
+              } else {
+                ysShowExtractedText(allText, file.name + '（共' + totalPages + '页）');
+              }
+            });
+          });
+        }
+        loadPage(1);
+      }).catch(function(err) {
+        toast('PDF解析失败: ' + err.message, 'error');
+      });
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    toast('不支持的文件格式，请上传 .pdf、.docx 或 .txt 文件', 'warning');
+  }
+}
+
+// 将提取的文本显示并准备解析
+function ysShowExtractedText(text, source) {
+  if (!text || !text.trim()) {
+    toast('未能从文件中提取到文字内容', 'warning');
+    return;
+  }
+  ysState.parseTab = 'text';
+  renderYaosushi();
+  setTimeout(function() {
+    var ta = document.getElementById('ysParseInput');
+    if (ta) {
+      ta.value = text.trim();
+    }
+    toast('✅ 文件读取成功（' + source + '），共 ' + text.trim().length + ' 字。点击「立即识别」开始解析', 'success');
+  }, 100);
 }
 
 // 启动解析
@@ -3324,6 +3648,12 @@ function ysStartParse() {
 function ysParseText(text) {
   var r = { _identified: 0, _typeId: null, _typeLabel: null };
 
+  // 预处理：PDF/DOCX提取的文本可能有大量空白和不规则格式
+  text = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  // 合并连续空格（保留换行）
+  var lines = text.split('\n').map(function(l) { return l.replace(/[ \t]{2,}/g, ' ').trim(); }).filter(function(l) { return l.length > 0; });
+  text = lines.join('\n');
+
   // ===== 1. 识别案由 =====
   var typeInfo = ysDetectCause(text);
   r._typeId = typeInfo.id;
@@ -3331,42 +3661,73 @@ function ysParseText(text) {
   if (typeInfo.id) r._identified++;
 
   // ===== 2. 提取原告信息 =====
-  // 匹配 "原告：姓名，性别，..." 或 "原告姓名：..." 段落
-  var ptf = ysExtractParty(text, ['原告', '申请人', '上诉人', '出借方', '出借人', '卖方', '买方']);
+  var ptf = ysExtractParty(text, ['原告', '申请人', '上诉人', '出借方', '出借人', '卖方', '买方', '债权人', '受害方', '承包方', '劳动者']);
   if (ptf.name) { r.p_name = ptf.name; r._identified++; }
   if (ptf.gender) r.p_gender = ptf.gender;
   if (ptf.phone) { r.p_phone = ptf.phone; r._identified++; }
   if (ptf.idno) r.p_idno = ptf.idno;
   if (ptf.addr) { r.p_addr = ptf.addr; r._identified++; }
+  if (ptf.birth) r.p_birth = ptf.birth;
+  if (ptf.ethnic) r.p_ethnic = ptf.ethnic;
+  if (ptf.workunit) r.p_workunit = ptf.workunit;
+  if (ptf.orgType) r.p_orgType = ptf.orgType;
 
   // ===== 3. 提取被告信息 =====
-  var def = ysExtractParty(text, ['被告', '被申请人', '被上诉人', '借款方', '借款人', '买方', '出卖方']);
+  var def = ysExtractParty(text, ['被告', '被申请人', '被上诉人', '借款方', '借款人', '出卖方', '用人单位', '保险人', '发包方', '肇事方']);
   if (def.name) { r.d_name = def.name; r._identified++; }
   if (def.gender) r.d_gender = def.gender;
   if (def.phone) { r.d_phone = def.phone; r._identified++; }
   if (def.idno) r.d_idno = def.idno;
   if (def.addr) { r.d_addr = def.addr; r._identified++; }
+  if (def.birth) r.d_birth = def.birth;
+  if (def.orgType) r.d_orgType = def.d_orgType;
 
   // ===== 4. 提取借款金额 =====
-  var amountMatch = text.match(/借款[金额本金]*[为是：:\s]*[人民币￥¥]?\s*([0-9,，]+(?:\.[0-9]+)?)\s*元/);
-  if (!amountMatch) amountMatch = text.match(/[金额本金][为是：:\s]*[人民币￥¥]?\s*([0-9,，]+(?:\.[0-9]+)?)\s*元/);
-  if (!amountMatch) amountMatch = text.match(/([0-9,，]+(?:\.[0-9]+)?)\s*元[整正]?\s*(?:人民币|RMB)?.*?(?:借|款|贷)/);
-  if (amountMatch) {
-    r.amount = amountMatch[1].replace(/,|，/g, '');
-    r._identified++;
+  var amountPatterns = [
+    /借款[金额本金]*[为是：:\s]*[人民币￥¥]?\s*([0-9,，]+(?:\.[0-9]+)?)\s*元/,
+    /[金额本金][为是：:\s]*[人民币￥¥]?\s*([0-9,，]+(?:\.[0-9]+)?)\s*元/,
+    /([0-9,，]+(?:\.[0-9]+)?)\s*元[整正]?\s*(?:人民币|RMB)?[^。\n]*?(?:借|款|贷)/,
+    /尚欠本金[人民币￥¥]?\s*([0-9,，]+(?:\.[0-9]+)?)\s*元/,
+    /本金[^0-9]*([0-9,，]+(?:\.[0-9]+)?)\s*元/,
+    /欠款[^0-9]*([0-9,，]+(?:\.[0-9]+)?)\s*元/,
+    /标的[金额]*[^0-9]*([0-9,，]+(?:\.[0-9]+)?)\s*元/
+  ];
+  for (var i = 0; i < amountPatterns.length; i++) {
+    var amountMatch = text.match(amountPatterns[i]);
+    if (amountMatch) {
+      r.amount = amountMatch[1].replace(/,|，/g, '');
+      r._identified++;
+      break;
+    }
   }
 
   // ===== 5. 提取利率 =====
-  var rateMatch = text.match(/(?:年利率|利率)[为是：:\s]*([0-9]+(?:\.[0-9]+)?)\s*%/);
-  if (!rateMatch) rateMatch = text.match(/([0-9]+(?:\.[0-9]+)?)\s*%\s*(?:的)?(?:年利率|月利率|利率)/);
-  if (rateMatch) { r.rate = rateMatch[1]; r._identified++; }
+  var ratePatterns = [
+    /(?:年利率|利率)[为是：:\s]*([0-9]+(?:\.[0-9]+)?)\s*%/,
+    /([0-9]+(?:\.[0-9]+)?)\s*%\s*(?:的)?(?:年利率|月利率|利率)/,
+    /月息[为是：:\s]*([0-9]+(?:\.[0-9]+)?)\s*%/, // 月息转年利率
+    /利率[（(][^）)]*?([0-9]+(?:\.[0-9]+)?)\s*%/,
+    /年利率[（(]\s*[第\s]*[一二三四五六七八九十\d]+\s*条[）)][为是：:\s]*([0-9]+(?:\.[0-9]+)?)\s*%/
+  ];
+  for (var i = 0; i < ratePatterns.length; i++) {
+    var rateMatch = text.match(ratePatterns[i]);
+    if (rateMatch) { r.rate = rateMatch[1]; r._identified++; break; }
+  }
 
   // ===== 6. 提取借款期限 =====
-  var periodMatch = text.match(/(?:借款期限|还款期限|借款期间|还款日期)[为是：:\s]*([\d零一二三四五六七八九十百]+年[\d零一二三四五六七八九十]+月[\d零一二三四五六七八九十]+日[至到—\-][\d零一二三四五六七八九十百]+年[\d零一二三四五六七八九十]+月[\d零一二三四五六七八九十]+日)/);
-  if (!periodMatch) periodMatch = text.match(/自?(2\d{3}年[0-9一二三四五六七八九十]+月[0-9一二三四五六七八九十]+日)[至到—\-](2\d{3}年[0-9一二三四五六七八九十]+月[0-9一二三四五六七八九十]+日)/);
-  if (periodMatch) {
-    r.period = periodMatch[1] + (periodMatch[2] ? '至' + periodMatch[2] : '');
-    r._identified++;
+  var periodPatterns = [
+    /(?:借款期限|还款期限|借款期间|还款日期)[为是：:\s]*([\d零一二三四五六七八九十百]+年[\d零一二三四五六七八九十]+月[\d零一二三四五六七八九十]+日[至到—\-][\d零一二三四五六七八九十百]+年[\d零一二三四五六七八九十]+月[\d零一二三四五六七八九十]+日)/,
+    /自?(2\d{3}年[0-9一二三四五六七八九十]+月[0-9一二三四五六七八九十]+日)[至到—\-](2\d{3}年[0-9一二三四五六七八九十]+月[0-9一二三四五六七八九十]+日)/,
+    /(?:2\d{3})年[0-9一二三四五六七八九十]+月[0-9一二三四五六七八九十]+日[至到—\-](?:2\d{3})年[0-9一二三四五六七八九十]+月[0-9一二三四五六七八九十]+日/,
+    /借[期款][^。]*?(\d{4}年\d{1,2}月\d{1,2}日)[^。]*?至[^。]*?(\d{4}年\d{1,2}月\d{1,2}日)/
+  ];
+  for (var i = 0; i < periodPatterns.length; i++) {
+    var periodMatch = text.match(periodPatterns[i]);
+    if (periodMatch) {
+      r.period = periodMatch[1] + (periodMatch[2] ? '至' + periodMatch[2] : '');
+      r._identified++;
+      break;
+    }
   }
 
   // ===== 7. 提取出借方式 =====
@@ -3374,15 +3735,43 @@ function ysParseText(text) {
   else if (/现金/.test(text)) r.payway = '现金';
 
   // ===== 8. 提取诉讼请求 =====
-  var claimsMatch = text.match(/(?:诉讼请求|请求事项|诉请)[：:\s\n]+([\s\S]{20,600}?)(?=事实与理由|事实理由|法律依据|此致|附|一、[^、])/);
-  if (claimsMatch) {
-    r.claims = claimsMatch[1].trim().slice(0, 300);
+  var claimsPatterns = [
+    /(?:诉讼请求|请求事项|诉请)[：:\s\n]+([\s\S]{20,600}?)(?=事实与理由|事实理由|法律依据|此致|附|一、[^、])/,
+    /(?:诉讼请求|请求事项)[：:\s\n]+([\s\S]{20,600}?)(?=\n\s*\n|事实|理由|此致)/
+  ];
+  for (var i = 0; i < claimsPatterns.length; i++) {
+    var claimsMatch = text.match(claimsPatterns[i]);
+    if (claimsMatch) {
+      r.claims = claimsMatch[1].trim().slice(0, 500);
+      r._identified++;
+      break;
+    }
+  }
+
+  // ===== 9. 提取事实与理由 =====
+  var factMatch = text.match(/(?:事实与理由|事实理由|事实)[：:\s\n]+([\s\S]{30,1500}?)(?=此致|此\s*致|具状人|起诉人|申请人|附[:：])/);
+  if (factMatch) {
+    r.facts = factMatch[1].trim().slice(0, 1000);
     r._identified++;
   }
 
-  // ===== 9. 提取代理律师 =====
+  // ===== 10. 提取代理律师 =====
   var agentMatch = text.match(/委托(?:诉讼)?代理人[：:\s]*([^\s，,。\n]{2,15})/);
   if (agentMatch) r.p_agent = agentMatch[1];
+
+  // ===== 11. 提取合同签订信息 =====
+  var ctMatch = text.match(/(?:签订|订立)[^。]{0,20}?(\d{4})年(\d{1,2})月(\d{1,2})日/);
+  if (ctMatch) {
+    r.ct_date = ctMatch[1] + '年' + ctMatch[2] + '月' + ctMatch[3] + '日';
+    r._identified++;
+  }
+
+  // ===== 12. 提取证据清单 =====
+  var evidenceMatch = text.match(/(?:证据|证据清单)[：:\s\n]+([\s\S]{20,500}?)(?=\n\s*\n|此致|具状人|附)/);
+  if (evidenceMatch) {
+    r.evidence = evidenceMatch[1].trim().slice(0, 500);
+    r._identified++;
+  }
 
   return r;
 }
@@ -3414,44 +3803,91 @@ function ysDetectCause(text) {
   return best && bestScore > 0 ? { id: best.id, label: best.label } : { id: null, label: null };
 }
 
-// 提取当事人信息（通用）
+// 提取当事人信息（通用，增强版）
 function ysExtractParty(text, labels) {
   var info = {};
-  // 找到第一个匹配标签的段落
-  var labelReg = new RegExp('(?:' + labels.join('|') + ')\\s*[：:、]\\s*([^\\n]{2,60})');
+  // 多种格式匹配：原告：xxx / 原告xxx / 原告  xxx
+  var labelReg = new RegExp('(?:' + labels.join('|') + ')[\\s：:、]*([^\\n]{2,100})');
   var m = text.match(labelReg);
+  if (!m) {
+    // 尝试跨行匹配
+    var labelIdx = -1;
+    for (var i = 0; i < labels.length; i++) {
+      var idx = text.indexOf(labels[i]);
+      if (idx >= 0 && (labelIdx < 0 || idx < labelIdx)) {
+        labelIdx = idx;
+      }
+    }
+    if (labelIdx >= 0) {
+      var afterLabel = text.slice(labelIdx).replace(/^.*?(原告|被告|申请人|被申请人|上诉人|被上诉人|出借方|出借人|借款方|借款人|卖方|买方|出卖方|承包方|发包方|劳动者|用人单位|保险人|被保险人|受害方|肇事方|债权人)[\s：:、]*/,'').trim();
+      m = afterLabel.length > 1 ? [afterLabel, afterLabel] : null;
+    }
+  }
   if (!m) return info;
-  var line = m[1];
+  var line = m[1] || m[0];
 
-  // 提取姓名（第一个词语，在逗号/，前）
-  var nameM = line.match(/^([^\s，,男女0-9]{2,10})/);
-  if (nameM) info.name = nameM[1].replace(/[，,。\s]$/, '');
+  // 判断是自然人还是法人
+  var orgKeywords = ['公司','企业','有限','股份','集团','银行','工厂','医院','学校','机构','事务所','合作社','协会'];
+  var isOrg = false;
+  for (var k = 0; k < orgKeywords.length; k++) {
+    if (line.indexOf(orgKeywords[k]) >= 0) { isOrg = true; break; }
+  }
+  info.orgType = isOrg ? '法人' : '自然人';
+
+  if (isOrg) {
+    // 法人：提取组织名称
+    var orgNameM = line.match(/^([^\s，,。;；()（）]{4,60}(?:公司|企业|厂|院|校|馆|所|中心|机构|事务所|协会|合作社|银行|集团))/);
+    if (!orgNameM) orgNameM = line.match(/^([^\s，,。;；]{2,60})/);
+    if (orgNameM) info.name = orgNameM[1].trim();
+  } else {
+    // 自然人：提取姓名
+    var nameM = line.match(/^([^\s，,男女0-9]{2,10})/);
+    if (nameM) info.name = nameM[1].replace(/[，,。\s]$/, '');
+  }
 
   // 性别
-  if (/男/.test(line.slice(0,20))) info.gender = '男';
-  else if (/女/.test(line.slice(0,20))) info.gender = '女';
+  if (/男/.test(line.slice(0,30))) info.gender = '男';
+  else if (/女/.test(line.slice(0,30))) info.gender = '女';
 
-  // 电话（11位手机号）
-  var phoneM = text.slice(Math.max(0, text.indexOf(m[0]) - 20), text.indexOf(m[0]) + 200).match(/1[3-9]\d{9}/);
+  // 出生日期（多种格式）
+  var birthM = line.match(/(\d{4})年(\d{1,2})月(\d{1,2})日/);
+  if (!birthM) birthM = line.match(/(\d{4})[^\d]{1,2}(\d{1,2})[^\d]{1,2}(\d{1,2})/);
+  if (birthM) info.birth = birthM[1] + '年' + birthM[2] + '月' + birthM[3] + '日';
+
+  // 民族
+  var ethnicM = line.match(/(汉族|回族|藏族|维吾尔族|苗族|彝族|壮族|布依族|朝鲜族|满族|侗族|瑶族|白族|土家族|哈尼族|哈萨克族|傣族|黎族|傈僳族|佤族|畲族|高山族|拉祜族|水族|东乡族|纳西族|景颇族|柯尔克孜族|土族|达斡尔族|仫佬族|羌族|布朗族|撒拉族|毛南族|仡佬族|锡伯族|阿昌族|普米族|塔吉克族|怒族|乌孜别克族|俄罗斯族|鄂温克族|德昂族|保安族|裕固族|京族|塔塔尔族|独龙族|鄂伦春族|赫哲族|门巴族|珞巴族|基诺族)/);
+  if (ethnicM) info.ethnic = ethnicM[1];
+
+  // 工作单位
+  var workM = line.match(/(?:工作单位|单位)[：:\s]*([^\s，,。;；]{2,40})/);
+  if (workM) info.workunit = workM[1];
+
+  // 电话（11位手机号，搜索范围扩大）
+  var searchStart = Math.max(0, text.indexOf(m[0]) - 100);
+  var searchEnd = Math.min(text.length, text.indexOf(m[0]) + 400);
+  var phoneM = text.slice(searchStart, searchEnd).match(/1[3-9]\d{9}/);
   if (phoneM) info.phone = phoneM[0];
 
-  // 身份证号
+  // 身份证号（18位）
   var idM = line.match(/([1-9]\d{5}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dX])/i);
   if (!idM) {
-    var context = text.slice(text.indexOf(m[0]), text.indexOf(m[0]) + 200);
+    var context = text.slice(text.indexOf(m[0]), Math.min(text.length, text.indexOf(m[0]) + 400));
     idM = context.match(/([1-9]\d{5}(?:18|19|20)\d{2}(?:0[1-9]|1[0-2])(?:0[1-9]|[12]\d|3[01])\d{3}[\dX])/i);
   }
   if (idM) info.idno = idM[1];
 
-  // 地址（现住/住所地/住址）
-  var addrM = text.slice(text.indexOf(m[0]), text.indexOf(m[0]) + 300).match(/(?:现住|住所地|住址|住所|通讯地址)[：:\s]*([^\n，,。]{6,60})/);
-  if (!addrM) addrM = line.match(/(?:住|居住于|地址)[：:\s]*([^\n，,。]{5,50})/);
-  if (!addrM) {
-    // 从整个行里取地址性内容（省/市/区/路/号/村）
-    var addrCandM = line.match(/([^\s，,]{2,5}(?:省|市|区|县|镇|街|路|号|村|组)[^\s，,。]{2,40})/);
-    if (addrCandM) addrM = addrCandM;
+  // 地址（多种模式匹配）
+  var addrPatterns = [
+    /(?:住所地|住址|住所|居住地|经常居住地|地址|通讯地址|户籍)[（(][^）)]+[）)][：:\s]*([^\n，,。]{6,80})/,
+    /(?:住所地|住址|住所|居住地|经常居住地|地址|通讯地址|现住|户籍)[：:\s]*([^\n，,。]{6,80})/,
+    /(?:住|居住于)[：:\s]*([^\n，,。]{5,60})/,
+    /([^\s，,]{2,5}(?:省|市|区|县|镇|乡|街|路|道|号|村|组|栋|楼|室|单元)[^\s，,。]{2,60})/
+  ];
+  for (var a = 0; a < addrPatterns.length; a++) {
+    var addrM = line.match(addrPatterns[a]);
+    if (!addrM) addrM = text.slice(text.indexOf(m[0]), Math.min(text.length, text.indexOf(m[0]) + 400)).match(addrPatterns[a]);
+    if (addrM) { info.addr = (addrM[1] || '').trim(); break; }
   }
-  if (addrM) info.addr = (addrM[1] || addrM[0]).trim();
 
   return info;
 }
@@ -3472,21 +3908,42 @@ function ysFillFormFromParse() {
   // 2. 等DOM渲染完成后填入字段
   setTimeout(function() {
     var pfx = ysGetFormPrefix(ysState.selectedType);
+    var filledCount = 0;
 
-    // 填原告
-    if (pr.p_name) ysSetField(pfx + '_p_name', pr.p_name);
-    if (pr.p_gender) ysSetSelect(pfx + '_p_gender', pr.p_gender);
-    if (pr.p_phone) ysSetField(pfx + '_p_phone', pr.p_phone);
-    if (pr.p_idno) ysSetField(pfx + '_p_idno', pr.p_idno);
-    if (pr.p_addr) ysSetField(pfx + '_p_addr', pr.p_addr);
-    if (pr.p_agent) ysSetField(pfx + '_p_agent', pr.p_agent);
+    // 填原告（根据识别到的当事人类型）
+    if (pr.p_orgType === '法人') {
+      // 法人当事人
+      ysSetField(pfx + '_p_org_name', pr.p_name);
+      ysSetField(pfx + '_p_org_addr', pr.p_addr);
+      ysSetField(pfx + '_p_org_phone', pr.p_phone);
+      // 切换到法人显示
+      ysTogglePartyType(pfx + '_p', '法人');
+    } else {
+      // 自然人当事人
+      if (pr.p_name) { ysSetField(pfx + '_p_name', pr.p_name); filledCount++; }
+      if (pr.p_gender) ysSetSelect(pfx + '_p_gender', pr.p_gender);
+      if (pr.p_phone) { ysSetField(pfx + '_p_phone', pr.p_phone); filledCount++; }
+      if (pr.p_idno) ysSetField(pfx + '_p_idno', pr.p_idno);
+      if (pr.p_addr) { ysSetField(pfx + '_p_addr', pr.p_addr); filledCount++; }
+      if (pr.p_birth) ysSetField(pfx + '_p_birth', pr.p_birth);
+      if (pr.p_ethnic) ysSetField(pfx + '_p_ethnic', pr.p_ethnic);
+      if (pr.p_workunit) ysSetField(pfx + '_p_workunit', pr.p_workunit);
+    }
+    if (pr.p_agent) { ysSetField(pfx + '_p_agent', pr.p_agent); filledCount++; }
 
     // 填被告
-    if (pr.d_name) ysSetField(pfx + '_d_name', pr.d_name);
-    if (pr.d_gender) ysSetSelect(pfx + '_d_gender', pr.d_gender);
-    if (pr.d_phone) ysSetField(pfx + '_d_phone', pr.d_phone);
-    if (pr.d_idno) ysSetField(pfx + '_d_idno', pr.d_idno);
-    if (pr.d_addr) ysSetField(pfx + '_d_addr', pr.d_addr);
+    if (pr.d_orgType === '法人') {
+      ysSetField(pfx + '_d_org_name', pr.d_name);
+      ysSetField(pfx + '_d_org_addr', pr.d_addr);
+      ysSetField(pfx + '_d_org_phone', pr.d_phone);
+      ysTogglePartyType(pfx + '_d', '法人');
+    } else {
+      if (pr.d_name) { ysSetField(pfx + '_d_name', pr.d_name); filledCount++; }
+      if (pr.d_gender) ysSetSelect(pfx + '_d_gender', pr.d_gender);
+      if (pr.d_phone) { ysSetField(pfx + '_d_phone', pr.d_phone); filledCount++; }
+      if (pr.d_idno) ysSetField(pfx + '_d_idno', pr.d_idno);
+      if (pr.d_addr) { ysSetField(pfx + '_d_addr', pr.d_addr); filledCount++; }
+    }
 
     // 填借贷相关字段（仅民间借贷）
     if (ysState.selectedType === 'minjie') {
@@ -3494,24 +3951,35 @@ function ysFillFormFromParse() {
         ysSetField('mj_principal', pr.amount);
         ysSetField('mj_amount', pr.amount);
         ysSetField('mj_actual', pr.amount);
+        filledCount++;
       }
-      if (pr.rate) ysSetField('mj_rate', pr.rate);
-      if (pr.period) ysSetField('mj_period', pr.period);
+      if (pr.rate) { ysSetField('mj_rate', pr.rate); filledCount++; }
+      if (pr.period) { ysSetField('mj_period', pr.period); filledCount++; }
       if (pr.payway) ysSetSelect('mj_payway', pr.payway);
+      if (pr.ct_date) ysSetField('mj_ctname', '借款合同，' + pr.ct_date);
     }
 
-    // 填诉讼请求到other备注
+    // 填诉讼请求
     if (pr.claims) {
       var otherEl = document.getElementById(pfx + '_other');
       if (!otherEl) otherEl = document.getElementById('mj_other');
       if (otherEl && !otherEl.value) otherEl.value = '【诉讼请求原文】\n' + pr.claims;
+      filledCount++;
+    }
+
+    // 填事实与理由
+    if (pr.facts) {
+      var factsEl = document.getElementById(pfx + '_facts');
+      if (!factsEl) factsEl = document.getElementById('mj_facts');
+      if (factsEl && !factsEl.value) factsEl.value = '【事实与理由原文】\n' + pr.facts;
+      filledCount++;
     }
 
     // 滚动到表单
     var formEl = document.getElementById('ysFormArea');
     if (formEl) formEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
-    toast('✅ 已自动填入 ' + pr._identified + ' 项要素，请核对后生成文书', 'success');
+    toast('✅ 已自动填入 ' + pr._identified + ' 项要素（' + filledCount + ' 项已填入表单），请核对后生成文书', 'success');
   }, 200);
 }
 
