@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>律师办公平台</title>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 <style>
   :root {
     --primary: #1a365d;
@@ -1332,6 +1331,10 @@ function renderSummaryChart(range) {
     datasets.push({ label: '案件', data: caseCounts, backgroundColor: 'rgba(56,161,105,0.7)', borderColor: '#38a169', borderWidth: 1 });
   }
 
+  if (typeof Chart === 'undefined') {
+    canvas.parentNode.innerHTML = '<p style="text-align:center;color:var(--text-secondary);padding:20px;">图表库加载中，请稍后刷新页面重试</p>';
+    return;
+  }
   summaryChart = new Chart(canvas, {
     type: summaryType === 'yearly' ? 'line' : 'bar',
     data: { labels: labels, datasets: datasets },
@@ -3565,5 +3568,6 @@ function navigateTo(page) {
 }
 
 </script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" defer onerror="console.log('Chart.js加载失败，图表功能暂不可用')"></script>
 </body>
 </html>
