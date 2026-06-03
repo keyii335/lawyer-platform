@@ -2705,15 +2705,99 @@ function buildMinjieDocx() {
   return rows;
 }
 
+// ====== 通用DOCX生成器（适用于所有文书类型） ======
+function buildGenericDocx(typeId) {
+  var typeInfo = YS_TYPES.find(function(t) { return t.id === typeId; });
+  if (!typeInfo) return null;
+  var pfx = ysGetFormPrefix(typeId);
+  var docTitle = typeInfo.type + '（' + typeInfo.name + '）';
+  var rows = [];
+
+  // 标题
+  rows.push(ysDr([ysDc([ysDp([ysDv(docTitle, { bold: true, size: 28 })])], { span: 2 })]));
+  // 说明
+  rows.push(ysDr([ysDc([
+    ysDp([ysDv('说明：为了方便您更好地参加诉讼，保护您的合法权利，请填写本表。', { size: 20 })]),
+    ysDp([ysDv('1. 起诉时需向人民法院提交证明您身份的材料，如身份证复印件、营业执照复印件等。', { size: 20 })]),
+    ysDp([ysDv('2. 本表所列内容是您提起诉讼以及人民法院查明案件事实所需，请务必如实填写。', { size: 20 })]),
+  ], { span: 2 })]));
+
+  // 当事人信息
+  var multiPfx = ['mj','mm','fmj','fz','jj','ld','lh','js','jd','bz','cs'];
+  if (multiPfx.indexOf(pfx) >= 0) {
+    try {
+      var parties = ysCollectParties(pfx);
+      if (parties.length) {
+        rows.push(ysHeaderRow('当事人信息'));
+        parties.forEach(function(p) {
+          if (p.partyType === '法人') { rows = rows.concat(ysDocxLegalRows(p, p.role)); }
+          else { rows = rows.concat(ysDocxNatureRows(p, p.role)); }
+          if (p.agent) rows = rows.concat(ysDocxAgentRow(p));
+        });
+      }
+    } catch(e) {}
+  } else {
+    // 申请书/答辩状等自定义当事人字段
+    var customMap = {
+      'zx': [['申请人姓名/名称','zx_pname'],['申请人电话','zx_pphone'],['申请人地址','zx_paddr'],['被执行人姓名/名称','zx_dname'],['被执行人电话','zx_dphone'],['被执行人地址','zx_daddr']],
+      'yj': [['申请人姓名/名称','yj_pname'],['申请人电话','yj_pphone'],['申请人地址','yj_paddr']],
+      'fy': [['申请人姓名/名称','fy_pname'],['申请人电话','fy_pphone'],['申请人地址','fy_paddr']],
+      'cyfp': [['申请人姓名/名称','cy_pname'],['申请人电话','cy_pphone'],['申请人地址','cy_paddr']],
+      'bzh': [['答辩人名称','bzd_name'],['答辩人电话','bzd_phone'],['答辩人地址','bzd_addr']]
+    };
+    if (customMap[pfx]) {
+      rows.push(ysHeaderRow('当事人信息'));
+      customMap[pfx].forEach(function(item) {
+        rows.push(ysLabelValueRow(item[0], ysGetV(item[1]) || '——'));
+      });
+    }
+  }
+
+  // 扫描表单区域生成剩余字段
+  var formEl = document.getElementById('ysForm_' + typeId);
+  if (formEl) {
+    var sections = formEl.querySelectorAll('.ys-form-section');
+    sections.forEach(function(sec) {
+      var titleEl = sec.querySelector('.ys-section-title');
+      if (!titleEl) return;
+      var stitle = titleEl.textContent.trim();
+      if (stitle === '当事人信息') return;
+      rows.push(ysHeaderRow(stitle));
+      var fields = sec.querySelectorAll('input, textarea, select');
+      fields.forEach(function(field) {
+        if (field.type === 'radio' || field.type === 'checkbox') return;
+        // 跳过隐藏字段
+        var el = field; var hidden = false;
+        while (el && el !== sec) { if (el.style && el.style.display === 'none') { hidden = true; break; } el = el.parentElement; }
+        if (hidden) return;
+        var label = '';
+        var p = field.parentElement;
+        if (p) { var le = p.querySelector('label'); if (le) label = le.textContent.trim().replace(/[*\s]+$/, ''); }
+        var value = field.value || '——';
+        if (label) rows.push(ysLabelValueRow(label, value));
+      });
+    });
+  }
+
+  // 签名区
+  rows.push(ysEmptyRow(2));
+  rows.push(ysDr([ysDc([
+    ysDp([ysDv('具状人（签字、盖章）：', { size: 21 })]),
+    ysDp([ysDv('日期：　　　　年　　　　月　　　　日', { size: 21 })]),
+  ], { span: 2 })]));
+  return rows;
+}
+
 // 通用docx下载入口
 function ysDownloadDocx(typeId) {
   if (typeof docx === 'undefined') { alert('docx.js库加载中，请稍后再试'); return; }
-  var typeName = '起诉状';
+  var typeInfo = YS_TYPES.find(function(t) { return t.id === typeId; });
+  var typeName = typeInfo ? (typeInfo.type + '（' + typeInfo.name + '）') : '要素式诉状';
   var tableRows = null;
   switch(typeId) {
     case 'jidong': tableRows = buildJidongDocx(); typeName = '机动车交通事故责任纠纷起诉状'; break;
     case 'minjie': tableRows = buildMinjieDocx(); typeName = '民间借贷纠纷起诉状'; break;
-    default: tableRows = buildMinjieDocx(); typeName = '要素式诉状';
+    default: tableRows = buildGenericDocx(typeId); break;
   }
   if (!tableRows) return;
 
@@ -3245,7 +3329,8 @@ function ysGetChecked(name) {
 // ==== 民间借贷纠纷 ====
 function renderYsFormMinjie() {
   var s = '<div id="ysForm_minjie">';
-  s += ysPartySection('mj', '出借方', '借款方', true);
+  ysInitParties();
+  s += ysMultiPartySection('mj', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
   s += '<div class="ys-grid-2">';
   s += '<div class="ys-field"><label>借款本金（元）</label><input id="mj_principal" type="number" placeholder="如：100000" /></div>';
@@ -3295,7 +3380,8 @@ function renderYsFormMinjie() {
 // ==== 买卖合同纠纷 ====
 function renderYsFormMaimai() {
   var s = '<div id="ysForm_maimai">';
-  s += ysPartySection('mm', '买方/卖方', '对方', true);
+  ysInitParties();
+  s += ysMultiPartySection('mm', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
   s += '<div class="ys-grid-2">';
   s += '<div class="ys-field"><label>原告角色</label><select id="mm_role"><option value="卖方">原告为卖方（主张价款）</option><option value="买方">原告为买方（主张违约）</option></select></div>';
@@ -3326,7 +3412,8 @@ function renderYsFormMaimai() {
   s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="mm_basis" value="《中华人民共和国民法典》第五百七十七条、第六百二十六条" /></div>';
   s += '</div>';
   s += '<div style="text-align:center;margin:20px 0;">';
-  s += '<button class="btn btn-primary" onclick="ysGenerate(\'maimai\')">📄 生成要素式诉状</button></div>';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'maimai\')">📄 生成预览</button>';
+  s += s += '<button class="btn btn-primary" style="background:#28a745;" onclick="ysDownloadDocx(\'maimai\')">📥 下载DOCX（可编辑）</button>';</div>';
   s += '<div id="ysPreview_maimai"></div></div>';
   return s;
 }
@@ -3334,7 +3421,8 @@ function renderYsFormMaimai() {
 // ==== 房屋买卖合同纠纷 ====
 function renderYsFormFangmaijie() {
   var s = '<div id="ysForm_fangmaijie">';
-  s += ysPartySection('fmj', '买方/卖方', '对方', true);
+  ysInitParties();
+  s += ysMultiPartySection('fmj', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
   s += '<div class="ys-grid-2">';
   s += '<div class="ys-field"><label>主张确认合同关系</label><select id="fmj_ctclaim"><option>继续履行</option><option>解除合同</option><option>确认合同无效</option><option>撤销合同</option><option>无此问题</option></select></div>';
@@ -3369,7 +3457,8 @@ function renderYsFormFangmaijie() {
   s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="fmj_basis" value="《中华人民共和国民法典》第五百六十三条、第五百七十七条" /></div>';
   s += '</div>';
   s += '<div style="text-align:center;margin:20px 0;">';
-  s += '<button class="btn btn-primary" onclick="ysGenerate(\'fangmaijie\')">📄 生成要素式诉状</button></div>';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'fangmaijie\')">📄 生成预览</button>';
+  s += s += '<button class="btn btn-primary" style="background:#28a745;" onclick="ysDownloadDocx(\'fangmaijie\')">📥 下载DOCX（可编辑）</button>';</div>';
   s += '<div id="ysPreview_fangmaijie"></div></div>';
   return s;
 }
@@ -3377,7 +3466,8 @@ function renderYsFormFangmaijie() {
 // ==== 房屋租赁合同纠纷 ====
 function renderYsFormFangzu() {
   var s = '<div id="ysForm_fangzu">';
-  s += ysPartySection('fz', '承租方/出租方', '对方', true);
+  ysInitParties();
+  s += ysMultiPartySection('fz', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
   s += '<div class="ys-grid-2">';
   s += '<div class="ys-field"><label>原告角色</label><select id="fz_role"><option>出租方</option><option>承租方</option></select></div>';
@@ -3405,7 +3495,8 @@ function renderYsFormFangzu() {
   s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="fz_basis" value="《中华人民共和国民法典》第七百零三条、第七百二十二条" /></div>';
   s += '</div>';
   s += '<div style="text-align:center;margin:20px 0;">';
-  s += '<button class="btn btn-primary" onclick="ysGenerate(\'fangzu\')">📄 生成要素式诉状</button></div>';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'fangzu\')">📄 生成预览</button>';
+  s += s += '<button class="btn btn-primary" style="background:#28a745;" onclick="ysDownloadDocx(\'fangzu\')">📥 下载DOCX（可编辑）</button>';</div>';
   s += '<div id="ysPreview_fangzu"></div></div>';
   return s;
 }
@@ -3413,7 +3504,8 @@ function renderYsFormFangzu() {
 // ==== 金融借款合同纠纷 ====
 function renderYsFormJinjie() {
   var s = '<div id="ysForm_jinjie">';
-  s += ysPartySection('jj', '贷款方', '借款方', true);
+  ysInitParties();
+  s += ysMultiPartySection('jj', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
   s += '<div class="ys-grid-2">';
   s += '<div class="ys-field"><label>借款本金（元）</label><input id="jj_principal" type="number" /></div>';
@@ -3446,7 +3538,8 @@ function renderYsFormJinjie() {
   s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="jj_basis" value="《中华人民共和国民法典》第六百七十四条、第六百七十五条" /></div>';
   s += '</div>';
   s += '<div style="text-align:center;margin:20px 0;">';
-  s += '<button class="btn btn-primary" onclick="ysGenerate(\'jinjie\')">📄 生成要素式诉状</button></div>';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'jinjie\')">📄 生成预览</button>';
+  s += s += '<button class="btn btn-primary" style="background:#28a745;" onclick="ysDownloadDocx(\'jinjie\')">📥 下载DOCX（可编辑）</button>';</div>';
   s += '<div id="ysPreview_jinjie"></div></div>';
   return s;
 }
@@ -3454,7 +3547,8 @@ function renderYsFormJinjie() {
 // ==== 劳动争议 ====
 function renderYsFormLaodong() {
   var s = '<div id="ysForm_laodong">';
-  s += ysPartySection('ld', '劳动者', '用人单位', true);
+  ysInitParties();
+  s += ysMultiPartySection('ld', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
   s += '<div class="ys-grid-3">';
   s += '<div class="ys-field"><label>主张工资支付</label><select id="ld_wage"><option>否</option><option>是</option></select></div>';
@@ -3490,7 +3584,8 @@ function renderYsFormLaodong() {
   s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="ld_basis" value="《中华人民共和国劳动合同法》第七条、第十条、第四十六条、第八十二条" /></div>';
   s += '</div>';
   s += '<div style="text-align:center;margin:20px 0;">';
-  s += '<button class="btn btn-primary" onclick="ysGenerate(\'laodong\')">📄 生成要素式诉状</button></div>';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'laodong\')">📄 生成预览</button>';
+  s += s += '<button class="btn btn-primary" style="background:#28a745;" onclick="ysDownloadDocx(\'laodong\')">📥 下载DOCX（可编辑）</button>';</div>';
   s += '<div id="ysPreview_laodong"></div></div>';
   return s;
 }
@@ -3498,7 +3593,8 @@ function renderYsFormLaodong() {
 // ==== 离婚纠纷 ====
 function renderYsFormLihun() {
   var s = '<div id="ysForm_lihun">';
-  s += ysPartySection('lh', '一方', '另一方', true);
+  ysInitParties();
+  s += ysMultiPartySection('lh', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
   s += '<div class="ys-field"><label>解除婚姻关系（具体主张）</label><input id="lh_divorceclaim" value="判决原告与被告离婚" /></div>';
   s += '<div class="ys-grid-2">';
@@ -3524,7 +3620,8 @@ function renderYsFormLihun() {
   s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="lh_basis" value="《中华人民共和国民法典》第一千零七十九条、第一千零八十七条" /></div>';
   s += '</div>';
   s += '<div style="text-align:center;margin:20px 0;">';
-  s += '<button class="btn btn-primary" onclick="ysGenerate(\'lihun\')">📄 生成要素式诉状</button></div>';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'lihun\')">📄 生成预览</button>';
+  s += s += '<button class="btn btn-primary" style="background:#28a745;" onclick="ysDownloadDocx(\'lihun\')">📥 下载DOCX（可编辑）</button>';</div>';
   s += '<div id="ysPreview_lihun"></div></div>';
   return s;
 }
@@ -3532,7 +3629,8 @@ function renderYsFormLihun() {
 // ==== 建设工程施工合同纠纷 ====
 function renderYsFormJianshe() {
   var s = '<div id="ysForm_jianshe">';
-  s += ysPartySection('js', '承包方', '发包方', true);
+  ysInitParties();
+  s += ysMultiPartySection('js', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
   s += '<div class="ys-grid-2">';
   s += '<div class="ys-field"><label>主张支付工程款（元）</label><input id="js_claim" type="number" /></div>';
@@ -3559,7 +3657,8 @@ function renderYsFormJianshe() {
   s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="js_basis" value="《中华人民共和国民法典》第七百九十三条、《建设工程司法解释（一）》第3条" /></div>';
   s += '</div>';
   s += '<div style="text-align:center;margin:20px 0;">';
-  s += '<button class="btn btn-primary" onclick="ysGenerate(\'jianshe\')">📄 生成要素式诉状</button></div>';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'jianshe\')">📄 生成预览</button>';
+  s += s += '<button class="btn btn-primary" style="background:#28a745;" onclick="ysDownloadDocx(\'jianshe\')">📥 下载DOCX（可编辑）</button>';</div>';
   s += '<div id="ysPreview_jianshe"></div></div>';
   return s;
 }
@@ -3619,7 +3718,8 @@ function renderYsFormJidong() {
 // ==== 不正当竞争纠纷 ====
 function renderYsFormBuzh() {
   var s = '<div id="ysForm_buzh">';
-  s += ysPartySection('bz', '投保人/被保险人', '保险人', true);
+  ysInitParties();
+  s += ysMultiPartySection('bz', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
   s += '<div class="ys-field"><label>不正当竞争行为类型</label><select id="bz_acttype"><option>仿冒混淆</option><option>商业诋毁</option><option>虚假宣传</option><option>侵犯商业秘密</option><option>其他</option></select></div>';
   s += '<div class="ys-grid-2">';
@@ -3636,7 +3736,8 @@ function renderYsFormBuzh() {
   s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="bz_basis" value="《中华人民共和国反不正当竞争法》第六条、第十七条" /></div>';
   s += '</div>';
   s += '<div style="text-align:center;margin:20px 0;">';
-  s += '<button class="btn btn-primary" onclick="ysGenerate(\'buzh\')">📄 生成要素式诉状</button></div>';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'buzh\')">📄 生成预览</button>';
+  s += s += '<button class="btn btn-primary" style="background:#28a745;" onclick="ysDownloadDocx(\'buzh\')">📥 下载DOCX（可编辑）</button>';</div>';
   s += '<div id="ysPreview_buzh"></div></div>';
   return s;
 }
@@ -3644,7 +3745,8 @@ function renderYsFormBuzh() {
 // ==== 财产损失保险合同纠纷 ====
 function renderYsFormCaisun() {
   var s = '<div id="ysForm_caisun">';
-  s += ysPartySection('cs', '被保险人', '保险人', true);
+  ysInitParties();
+  s += ysMultiPartySection('cs', true);
   s += '<div class="ys-form-section"><div class="ys-section-title">诉讼请求</div>';
   s += '<div class="ys-grid-2">';
   s += '<div class="ys-field"><label>主张保险赔偿金（元）</label><input id="cs_claim" type="number" /></div>';
@@ -3664,7 +3766,8 @@ function renderYsFormCaisun() {
   s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="cs_basis" value="《中华人民共和国保险法》第十三条、第二十三条" /></div>';
   s += '</div>';
   s += '<div style="text-align:center;margin:20px 0;">';
-  s += '<button class="btn btn-primary" onclick="ysGenerate(\'caisun\')">📄 生成要素式诉状</button></div>';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'caisun\')">📄 生成预览</button>';
+  s += s += '<button class="btn btn-primary" style="background:#28a745;" onclick="ysDownloadDocx(\'caisun\')">📥 下载DOCX（可编辑）</button>';</div>';
   s += '<div id="ysPreview_caisun"></div></div>';
   return s;
 }
@@ -3688,7 +3791,8 @@ function renderYsFormBaozheng() {
   s += '<div class="ys-field"><label>请求依据（法律条文）</label><input id="bzd_basis" value="《中华人民共和国保险法》" /></div>';
   s += '</div>';
   s += '<div style="text-align:center;margin:20px 0;">';
-  s += '<button class="btn btn-primary" onclick="ysGenerate(\'baozheng\')">📄 生成要素式答辩状</button></div>';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'baozheng\')">📄 生成预览</button>';
+  s += '<button class="btn btn-primary" style="background:#28a745;" onclick="ysDownloadDocx(\'baozheng\')">📥 下载DOCX（可编辑）</button></div>';
   s += '<div id="ysPreview_baozheng"></div></div>';
   return s;
 }
@@ -3719,7 +3823,8 @@ function renderYsFormZhixing() {
   s += '<div class="ys-field"><label>被执行人已知财产线索</label><textarea id="zx_assets" rows="2" placeholder="如：银行账户XX、房产XX等" /></div>';
   s += '</div>';
   s += '<div style="text-align:center;margin:20px 0;">';
-  s += '<button class="btn btn-primary" onclick="ysGenerate(\'zhixing\')">📄 生成强制执行申请书</button></div>';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'zhixing\')">📄 生成预览</button>';
+  s += '<button class="btn btn-primary" style="background:#28a745;" onclick="ysDownloadDocx(\'zhixing\')">📥 下载DOCX（可编辑）</button></div>';
   s += '<div id="ysPreview_zhixing"></div></div>';
   return s;
 }
@@ -3744,7 +3849,8 @@ function renderYsFormYijian() {
   s += '<div class="ys-field"><label>请求依据</label><input id="yj_basis" value="《中华人民共和国民事诉讼法》第二百三十六条" /></div>';
   s += '</div>';
   s += '<div style="text-align:center;margin:20px 0;">';
-  s += '<button class="btn btn-primary" onclick="ysGenerate(\'yijian\')">📄 生成执行异议申请书</button></div>';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'yijian\')">📄 生成预览</button>';
+  s += '<button class="btn btn-primary" style="background:#28a745;" onclick="ysDownloadDocx(\'yijian\')">📥 下载DOCX（可编辑）</button></div>';
   s += '<div id="ysPreview_yijian"></div></div>';
   return s;
 }
@@ -3770,7 +3876,8 @@ function renderYsFormFuyi() {
   s += '<div class="ys-field"><label>请求依据</label><input id="fy_basis" value="《中华人民共和国民事诉讼法》第二百三十八条" /></div>';
   s += '</div>';
   s += '<div style="text-align:center;margin:20px 0;">';
-  s += '<button class="btn btn-primary" onclick="ysGenerate(\'fuyi\')">📄 生成执行复议申请书</button></div>';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'fuyi\')">📄 生成预览</button>';
+  s += '<button class="btn btn-primary" style="background:#28a745;" onclick="ysDownloadDocx(\'fuyi\')">📥 下载DOCX（可编辑）</button></div>';
   s += '<div id="ysPreview_fuyi"></div></div>';
   return s;
 }
@@ -3798,7 +3905,8 @@ function renderYsFormCanyufenpei() {
   s += '<div class="ys-field"><label>请求依据</label><input id="cy_basis" value="《最高人民法院关于适用〈民事诉讼法〉执行程序若干问题的解释》第29条" /></div>';
   s += '</div>';
   s += '<div style="text-align:center;margin:20px 0;">';
-  s += '<button class="btn btn-primary" onclick="ysGenerate(\'canyufenpei\')">📄 生成参与分配申请书</button></div>';
+  s += '<button class="btn btn-primary" onclick="ysGenerate(\'canyufenpei\')">📄 生成预览</button>';
+  s += '<button class="btn btn-primary" style="background:#28a745;" onclick="ysDownloadDocx(\'canyufenpei\')">📥 下载DOCX（可编辑）</button></div>';
   s += '<div id="ysPreview_canyufenpei"></div></div>';
   return s;
 }
@@ -3872,8 +3980,8 @@ function ysGenDoc(typeId) {
 }
 
 function ysGenMinjie() {
-  var p = ysGetV('mj_p_name'), d = ysGetV('mj_d_name');
-  var pOrg = ysGetV('mj_p_org_name'), dOrg = ysGetV('mj_d_org_name');
+  var p = ysGetV('mj_p0_name'), d = ysGetV('mj_d0_name');
+  var pOrg = ysGetV('mj_p0_org_name'), dOrg = ysGetV('mj_d0_org_name');
   if (!p && !pOrg) { alert('请填写原告信息！'); return ''; }
   if (!d && !dOrg) { alert('请填写被告信息！'); return ''; }
   var principal = ysGetV('mj_principal'), interest = ysGetV('mj_interest');
@@ -3884,13 +3992,13 @@ function ysGenMinjie() {
   var payway = ysGetV('mj_payway'), period = ysGetV('mj_period'), rate = ysGetV('mj_rate');
   var expired = ysGetV('mj_expired'), repaidp = ysGetV('mj_repaid_p'), repaidi = ysGetV('mj_repaid_i');
   var guarantee = ysGetV('mj_guarantee'), other = ysGetV('mj_other'), basis = ysGetV('mj_basis');
-  var pgender = ysGetV('mj_p_gender'), pphone = ysGetV('mj_p_phone'), paddr = ysGetV('mj_p_addr');
-  var presid = ysGetV('mj_p_resident'), pidtype = ysGetV('mj_p_idtype'), pidno = ysGetV('mj_p_idno');
-  var pbirth = ysGetV('mj_p_birth'), pethnic = ysGetV('mj_p_ethnic'), pwork = ysGetV('mj_p_workunit'), ppos = ysGetV('mj_p_position');
-  var dgender = ysGetV('mj_d_gender'), dphone = ysGetV('mj_d_phone'), daddr = ysGetV('mj_d_addr');
-  var didno = ysGetV('mj_d_idno'), dbirth = ysGetV('mj_d_birth'), dethnic = ysGetV('mj_d_ethnic');
-  var dwork = ysGetV('mj_d_workunit'), dpos = ysGetV('mj_d_position');
-  var pagent = ysGetV('mj_p_agent'), pagentlv = ysGetV('mj_p_agentlv'), pagentorg = ysGetV('mj_p_agent_org');
+  var pgender = ysGetV('mj_p0_gender'), pphone = ysGetV('mj_p0_phone'), paddr = ysGetV('mj_p0_addr');
+  var presid = ysGetV('mj_p0_resident'), pidtype = ysGetV('mj_p0_idtype'), pidno = ysGetV('mj_p0_idno');
+  var pbirth = ysGetV('mj_p0_birth'), pethnic = ysGetV('mj_p0_ethnic'), pwork = ysGetV('mj_p0_workunit'), ppos = ysGetV('mj_p0_position');
+  var dgender = ysGetV('mj_d0_gender'), dphone = ysGetV('mj_d0_phone'), daddr = ysGetV('mj_d0_addr');
+  var didno = ysGetV('mj_d0_idno'), dbirth = ysGetV('mj_d0_birth'), dethnic = ysGetV('mj_d0_ethnic');
+  var dwork = ysGetV('mj_d0_workunit'), dpos = ysGetV('mj_d0_position');
+  var pagent = ysGetV('mj_p0_agent'), pagentlv = ysGetV('mj_p0_agentlv'), pagentorg = ysGetV('mj_p0_agent_org');
   var displayName = p || pOrg;
 
   var html = ysDocHeader('民事起诉状', '民间借贷纠纷');
@@ -3911,11 +4019,11 @@ function ysGenMinjie() {
     html += ysDocTable([
       ['原告（法人、非法人组织）'],
       ['名称', pOrg],
-      ['住所地（主要办事机构所在地）', ysGetV('mj_p_org_addr') || '——'],
-      ['注册地/登记地', ysGetV('mj_p_org_regaddr') || '——'],
-      ['法定代表人/负责人', ysGetV('mj_p_org_legal') || '——'],
-      ['统一社会信用代码', ysGetV('mj_p_org_code') || '——'],
-      ['联系电话', ysGetV('mj_p_org_phone') || '——'],
+      ['住所地（主要办事机构所在地）', ysGetV('mj_p0_org_addr') || '——'],
+      ['注册地/登记地', ysGetV('mj_p0_org_regaddr') || '——'],
+      ['法定代表人/负责人', ysGetV('mj_p0_org_legal') || '——'],
+      ['统一社会信用代码', ysGetV('mj_p0_org_code') || '——'],
+      ['联系电话', ysGetV('mj_p0_org_phone') || '——'],
     ]);
   } else {
     html += ysDocTable([
@@ -3942,9 +4050,9 @@ function ysGenMinjie() {
     html += ysDocTable([
       ['被告（法人、非法人组织）'],
       ['名称', dOrg],
-      ['住所地（主要办事机构所在地）', ysGetV('mj_d_org_addr') || '——'],
-      ['法定代表人/负责人', ysGetV('mj_d_org_legal') || '——'],
-      ['统一社会信用代码', ysGetV('mj_d_org_code') || '——'],
+      ['住所地（主要办事机构所在地）', ysGetV('mj_d0_org_addr') || '——'],
+      ['法定代表人/负责人', ysGetV('mj_d0_org_legal') || '——'],
+      ['统一社会信用代码', ysGetV('mj_d0_org_code') || '——'],
     ]);
   } else {
     html += ysDocTable([
@@ -4020,7 +4128,7 @@ function ysGenMinjie() {
 }
 
 function ysGenMaimai() {
-  var p = ysGetV('mm_p_name'), d = ysGetV('mm_d_name');
+  var p = ysGetV('mm_p0_name'), d = ysGetV('mm_d0_name');
   if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
   var role = ysGetV('mm_role'), claim = ysGetV('mm_claim'), interest = ysGetV('mm_interest');
   var dissolve = ysGetV('mm_dissolve'), othercost = ysGetV('mm_othercost');
@@ -4039,11 +4147,11 @@ function ysGenMaimai() {
     ['当事人信息'],
     ['原告（姓名/名称）', p],
     ['原告角色', role],
-    ['住所地', ysGetV('mm_p_addr') || '——'],
-    ['联系电话', ysGetV('mm_p_phone') || '——'],
-    ['委托代理人', ysGetV('mm_p_agent') ? ysGetV('mm_p_agent') + '（' + ysGetV('mm_p_agentlv') + '）' : '无'],
+    ['住所地', ysGetV('mm_p0_addr') || '——'],
+    ['联系电话', ysGetV('mm_p0_phone') || '——'],
+    ['委托代理人', ysGetV('mm_p0_agent') ? ysGetV('mm_p0_agent') + '（' + ysGetV('mm_p0_agentlv') + '）' : '无'],
     ['被告（姓名/名称）', d],
-    ['住所地', ysGetV('mm_d_addr') || '——'],
+    ['住所地', ysGetV('mm_d0_addr') || '——'],
     ['诉讼请求'],
     ['1. 主张金额', (claim || '——') + ' 元（人民币）'],
     ['2. 利息/违约金', interest || '——'],
@@ -4064,15 +4172,15 @@ function ysGenMaimai() {
 }
 
 function ysGenFangmaijie() {
-  var p = ysGetV('fmj_p_name'), d = ysGetV('fmj_d_name');
+  var p = ysGetV('fmj_p0_name'), d = ysGetV('fmj_d0_name');
   if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
   var html = ysDocHeader('民事起诉状', '房屋买卖合同纠纷');
   html += ysDocTable([['具状人（签字、盖章）：' + p + '　　日期：　　年　　月　　日']]);
   html += '<br>';
   html += ysDocTable([
     ['当事人信息'],
-    ['原告', p + '　住所：' + (ysGetV('fmj_p_addr')||'——') + '　电话：' + (ysGetV('fmj_p_phone')||'——')],
-    ['被告', d + '　住所：' + (ysGetV('fmj_d_addr')||'——')],
+    ['原告', p + '　住所：' + (ysGetV('fmj_p0_addr')||'——') + '　电话：' + (ysGetV('fmj_p0_phone')||'——')],
+    ['被告', d + '　住所：' + (ysGetV('fmj_d0_addr')||'——')],
     ['诉讼请求'],
     ['1. 合同关系处理', ysGetV('fmj_ctclaim')],
     ['2. 购房款处理', ysGetV('fmj_payclaim') + '；金额：' + (ysGetV('fmj_money')||'——') + '元'],
@@ -4096,15 +4204,15 @@ function ysGenFangmaijie() {
 }
 
 function ysGenFangzu() {
-  var p = ysGetV('fz_p_name'), d = ysGetV('fz_d_name');
+  var p = ysGetV('fz_p0_name'), d = ysGetV('fz_d0_name');
   if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
   var html = ysDocHeader('民事起诉状', '房屋租赁合同纠纷');
   html += ysDocTable([['具状人（签字、盖章）：' + p + '　　日期：　　年　　月　　日']]);
   html += '<br>';
   html += ysDocTable([
     ['当事人信息'],
-    ['原告（' + ysGetV('fz_role') + '）', p + '　住所：' + (ysGetV('fz_p_addr')||'——')],
-    ['被告', d + '　住所：' + (ysGetV('fz_d_addr')||'——')],
+    ['原告（' + ysGetV('fz_role') + '）', p + '　住所：' + (ysGetV('fz_p0_addr')||'——')],
+    ['被告', d + '　住所：' + (ysGetV('fz_d0_addr')||'——')],
     ['诉讼请求'],
     ['1. 是否要求解除合同', ysGetV('fz_dissolve')],
     ['2. 欠付租金（元）', (ysGetV('fz_rent')||'——')],
@@ -4123,15 +4231,15 @@ function ysGenFangzu() {
 }
 
 function ysGenJinjie() {
-  var p = ysGetV('jj_p_name'), d = ysGetV('jj_d_name');
+  var p = ysGetV('jj_p0_name'), d = ysGetV('jj_d0_name');
   if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
   var html = ysDocHeader('民事起诉状', '金融借款合同纠纷');
   html += ysDocTable([['具状人（签字、盖章）：' + p + '　　日期：　　年　　月　　日']]);
   html += '<br>';
   html += ysDocTable([
     ['当事人信息'],
-    ['原告（贷款方）', p + '　住所：' + (ysGetV('jj_p_addr')||'——')],
-    ['被告', d + '　住所：' + (ysGetV('jj_d_addr')||'——')],
+    ['原告（贷款方）', p + '　住所：' + (ysGetV('jj_p0_addr')||'——')],
+    ['被告', d + '　住所：' + (ysGetV('jj_d0_addr')||'——')],
     ['诉讼请求'],
     ['1. 本金（元）', (ysGetV('jj_principal')||'——') + '；截至：' + (ysGetV('jj_calcdate')||'——')],
     ['2. 期内利息（元）', ysGetV('jj_interest')||'——'],
@@ -4155,7 +4263,7 @@ function ysGenJinjie() {
 }
 
 function ysGenLaodong() {
-  var p = ysGetV('ld_p_name'), d = ysGetV('ld_d_name');
+  var p = ysGetV('ld_p0_name'), d = ysGetV('ld_d0_name');
   if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
   var claimRows = [];
   if (ysGetV('ld_wage') === '是') claimRows.push(['支付工资（元）', ysGetV('ld_wageval')||'——']);
@@ -4170,9 +4278,9 @@ function ysGenLaodong() {
   html += '<br>';
   var rows = [
     ['当事人信息'],
-    ['原告（劳动者）', p + '　住所：' + (ysGetV('ld_p_addr')||'——') + '　电话：' + (ysGetV('ld_p_phone')||'——')],
-    ['委托代理人', ysGetV('ld_p_agent') ? ysGetV('ld_p_agent') + '（' + ysGetV('ld_p_agentlv') + '）' : '无'],
-    ['被告（用人单位）', d + '　住所：' + (ysGetV('ld_d_addr')||'——')],
+    ['原告（劳动者）', p + '　住所：' + (ysGetV('ld_p0_addr')||'——') + '　电话：' + (ysGetV('ld_p0_phone')||'——')],
+    ['委托代理人', ysGetV('ld_p0_agent') ? ysGetV('ld_p0_agent') + '（' + ysGetV('ld_p0_agentlv') + '）' : '无'],
+    ['被告（用人单位）', d + '　住所：' + (ysGetV('ld_d0_addr')||'——')],
     ['诉讼请求'],
   ];
   claimRows.forEach(function(r, i) {
@@ -4194,16 +4302,16 @@ function ysGenLaodong() {
 }
 
 function ysGenLihun() {
-  var p = ysGetV('lh_p_name'), d = ysGetV('lh_d_name');
+  var p = ysGetV('lh_p0_name'), d = ysGetV('lh_d0_name');
   if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
   var html = ysDocHeader('民事起诉状', '离婚纠纷');
   html += ysDocTable([['具状人（签字、盖章）：' + p + '　　日期：　　年　　月　　日']]);
   html += '<br>';
   html += ysDocTable([
     ['当事人信息'],
-    ['原告', p + '　住所：' + (ysGetV('lh_p_addr')||'——') + '　电话：' + (ysGetV('lh_p_phone')||'——')],
-    ['委托代理人', ysGetV('lh_p_agent') ? ysGetV('lh_p_agent') + '（' + ysGetV('lh_p_agentlv') + '）' : '无'],
-    ['被告', d + '　住所：' + (ysGetV('lh_d_addr')||'——')],
+    ['原告', p + '　住所：' + (ysGetV('lh_p0_addr')||'——') + '　电话：' + (ysGetV('lh_p0_phone')||'——')],
+    ['委托代理人', ysGetV('lh_p0_agent') ? ysGetV('lh_p0_agent') + '（' + ysGetV('lh_p0_agentlv') + '）' : '无'],
+    ['被告', d + '　住所：' + (ysGetV('lh_d0_addr')||'——')],
     ['诉讼请求'],
     ['1. 解除婚姻关系', ysGetV('lh_divorceclaim')],
     ['2. 夫妻共同财产处理', ysGetV('lh_property')||'无此问题'],
@@ -4225,15 +4333,15 @@ function ysGenLihun() {
 }
 
 function ysGenJianshe() {
-  var p = ysGetV('js_p_name'), d = ysGetV('js_d_name');
+  var p = ysGetV('js_p0_name'), d = ysGetV('js_d0_name');
   if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
   var html = ysDocHeader('民事起诉状', '建设工程施工合同纠纷');
   html += ysDocTable([['具状人（签字、盖章）：' + p + '　　日期：　　年　　月　　日']]);
   html += '<br>';
   html += ysDocTable([
     ['当事人信息'],
-    ['原告', p + '　住所：' + (ysGetV('js_p_addr')||'——')],
-    ['被告', d + '　住所：' + (ysGetV('js_d_addr')||'——')],
+    ['原告', p + '　住所：' + (ysGetV('js_p0_addr')||'——')],
+    ['被告', d + '　住所：' + (ysGetV('js_d0_addr')||'——')],
     ['诉讼请求'],
     ['1. 主张工程款（元）', ysGetV('js_claim')||'——'],
     ['2. 利息/违约金', ysGetV('js_interest')||'——'],
@@ -4255,7 +4363,7 @@ function ysGenJianshe() {
 }
 
 function ysGenJidong() {
-  var p = ysGetV('jd_p_name'), d = ysGetV('jd_d_name');
+  var p = ysGetV('jd_p0_name'), d = ysGetV('jd_d0_name');
   if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
   var items = [
     ['医疗费', 'jd_medical'], ['误工费', 'jd_lostwork'], ['护理费', 'jd_nursing'],
@@ -4278,8 +4386,8 @@ function ysGenJidong() {
   html += '<br>';
   var rows = [
     ['当事人信息'],
-    ['原告（受害方）', p + '　住所：' + (ysGetV('jd_p_addr')||'——')],
-    ['被告', d + '　住所：' + (ysGetV('jd_d_addr')||'——')],
+    ['原告（受害方）', p + '　住所：' + (ysGetV('jd_p0_addr')||'——')],
+    ['被告', d + '　住所：' + (ysGetV('jd_d0_addr')||'——')],
     ['诉讼请求（赔偿项目）'],
   ];
   claimRows.forEach(function(r, i) { rows.push([(i+1) + '. ' + r[0], r[1]]); });
@@ -4301,15 +4409,15 @@ function ysGenJidong() {
 }
 
 function ysGenBuzh() {
-  var p = ysGetV('bz_p_name'), d = ysGetV('bz_d_name');
+  var p = ysGetV('bz_p0_name'), d = ysGetV('bz_d0_name');
   if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
   var html = ysDocHeader('民事起诉状', '不正当竞争纠纷');
   html += ysDocTable([['具状人（签字、盖章）：' + p + '　　日期：　　年　　月　　日']]);
   html += '<br>';
   html += ysDocTable([
     ['当事人信息'],
-    ['原告', p + '　住所：' + (ysGetV('bz_p_addr')||'——')],
-    ['被告', d + '　住所：' + (ysGetV('bz_d_addr')||'——')],
+    ['原告', p + '　住所：' + (ysGetV('bz_p0_addr')||'——')],
+    ['被告', d + '　住所：' + (ysGetV('bz_d0_addr')||'——')],
     ['诉讼请求'],
     ['1. 侵权类型', ysGetV('bz_acttype')],
     ['2. 是否要求停止侵权', ysGetV('bz_stop')],
@@ -4327,15 +4435,15 @@ function ysGenBuzh() {
 }
 
 function ysGenCaisun() {
-  var p = ysGetV('cs_p_name'), d = ysGetV('cs_d_name');
+  var p = ysGetV('cs_p0_name'), d = ysGetV('cs_d0_name');
   if (!p || !d) { alert('请填写原告和被告姓名！'); return ''; }
   var html = ysDocHeader('民事起诉状', '财产损失保险合同纠纷');
   html += ysDocTable([['具状人（签字、盖章）：' + p + '　　日期：　　年　　月　　日']]);
   html += '<br>';
   html += ysDocTable([
     ['当事人信息'],
-    ['原告（被保险人）', p + '　住所：' + (ysGetV('cs_p_addr')||'——')],
-    ['被告（保险公司）', d + '　住所：' + (ysGetV('cs_d_addr')||'——')],
+    ['原告（被保险人）', p + '　住所：' + (ysGetV('cs_p0_addr')||'——')],
+    ['被告（保险公司）', d + '　住所：' + (ysGetV('cs_d0_addr')||'——')],
     ['诉讼请求'],
     ['1. 主张保险赔偿金（元）', ysGetV('cs_claim')||'——'],
     ['2. 是否主张利息', ysGetV('cs_interest')],
@@ -4891,8 +4999,9 @@ function ysFillFormFromParse() {
     var pfx = ysGetFormPrefix(ysState.selectedType);
     var filledCount = 0;
 
-    // 判断是否使用多人表单（目前只有jidong使用ysMultiPartySection）
-    var useMultiParty = (ysState.selectedType === 'jidong');
+    // 判断是否使用多人表单
+    var multiPartyTypes = ['minjie','maimai','fangmaijie','fangzu','jinjie','laodong','lihun','jianshe','jidong','buzh','caisun'];
+    var useMultiParty = multiPartyTypes.indexOf(ysState.selectedType) >= 0;
     // 原告/被告字段前缀：多人表单带索引0，单人表单不带
     var pIdBase = useMultiParty ? pfx + '_p0' : pfx + '_p';
     var dIdBase = useMultiParty ? pfx + '_d0' : pfx + '_d';
